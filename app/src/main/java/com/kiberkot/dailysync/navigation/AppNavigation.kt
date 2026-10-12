@@ -1,72 +1,83 @@
 package com.kiberkot.dailysync.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.kiberkot.dailysync.model.CategoriaAnimo
+import com.kiberkot.dailysync.model.RegistroAnimo
 import com.kiberkot.dailysync.ui.detalle.DetalleScreen
 import com.kiberkot.dailysync.ui.home.HomeScreen
 import com.kiberkot.dailysync.ui.registro.RegistroAnimoScreen
 import com.kiberkot.dailysync.viewmodel.AnimoViewModel
 
-// Rutas estables de navegación
 object Destinos {
     const val HOME = "home"
     const val REGISTRO = "registro"
     const val DETALLE = "detalle/{registroId}"
-    fun crearRutaDetalle(id: String) = "detalle/$id"
+    fun crearRutaDetalle(registroId: String): String = "detalle/$registroId"
 }
 
 @Composable
-fun DailySyncApp(
+fun AppNavigation(
+    navController: NavHostController = rememberNavController(),
     viewModel: AnimoViewModel = viewModel()
 ) {
-    val navController = rememberNavController()
+    val uiState by viewModel.uiState.collectAsState()
 
     NavHost(
         navController = navController,
         startDestination = Destinos.HOME
     ) {
-        // PANTALLA 1: Home / Historial
         composable(Destinos.HOME) {
             HomeScreen(
-                historial = viewModel.historialAnimo,
+                historial = uiState.historial,
                 onNuevoRegistro = { navController.navigate(Destinos.REGISTRO) },
-                onVerDetalle = { id -> navController.navigate(Destinos.crearRutaDetalle(id)) }
+                onVerDetalle = { id: String -> navController.navigate(Destinos.crearRutaDetalle(id)) }
             )
         }
 
-        // PANTALLA 2: Formulario RF12
         composable(Destinos.REGISTRO) {
             RegistroAnimoScreen(
-                state = viewModel.uiState,
-                onSeleccionarCategoria = viewModel::seleccionarCategoria,
-                onCambioIntensidad = viewModel::actualizarIntensidad,
-                onCambioContexto = viewModel::actualizarContexto,
-                onCambioNota = viewModel::actualizarNota,
+                state = uiState,
+                onSeleccionarCategoria = { categoria: CategoriaAnimo ->
+                    viewModel.seleccionarCategoria(categoria)
+                },
+                onCambioIntensidad = { intensidad: Float ->
+                    viewModel.cambiarIntensidad(intensidad)
+                },
+                onCambioContexto = { contexto: String ->
+                    viewModel.cambiarContexto(contexto)
+                },
+                onCambioNota = { nota: String ->
+                    viewModel.cambiarNota(nota)
+                },
                 onGuardar = {
-                    val nuevoId = viewModel.guardarRegistro()
-                    if (nuevoId != null) {
-                        // Navega al detalle del registro recién creado
-                        navController.navigate(Destinos.crearRutaDetalle(nuevoId)) {
-                            popUpTo(Destinos.HOME)
-                        }
+                    val guardadoExitoso = viewModel.guardarRegistro()
+                    if (guardadoExitoso) {
+                        navController.popBackStack()
                     }
-                }
+                },
+                onOcultarBanner = { viewModel.ocultarBanner() }
             )
         }
 
-        // PANTALLA 3: Detalle por ID
         composable(
             route = Destinos.DETALLE,
             arguments = listOf(navArgument("registroId") { type = NavType.StringType })
-        ) { backStackEntry ->
-            val id = backStackEntry.arguments?.getString("registroId") ?: ""
+        ) { backStackEntry: NavBackStackEntry ->
+            val registroId = backStackEntry.arguments?.getString("registroId")
+            val registroEncontrado: RegistroAnimo? = uiState.historial.find { reg: RegistroAnimo -> reg.id == registroId }
+
             DetalleScreen(
-                registro = viewModel.buscarPorId(id),
+                registro = registroEncontrado,
                 onVolver = { navController.popBackStack() }
             )
         }

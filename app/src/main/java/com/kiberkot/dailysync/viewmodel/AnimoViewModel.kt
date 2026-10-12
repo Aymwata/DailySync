@@ -1,97 +1,166 @@
 package com.kiberkot.dailysync.viewmodel
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.kiberkot.dailysync.data.local.AppDatabase
+import com.kiberkot.dailysync.data.local.entities.RegistroAnimoEntity
 import com.kiberkot.dailysync.model.CategoriaAnimo
 import com.kiberkot.dailysync.model.RegistroAnimo
+import com.kiberkot.dailysync.utils.NotificationHelper
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
 
 data class AnimoUiState(
-    val categorias: List<CategoriaAnimo> = listOf(
-        CategoriaAnimo(1, "Tranquilo / Calmo"),
-        CategoriaAnimo(2, "Motivado / Con energía"),
-        CategoriaAnimo(3, "Ansioso / Inquieto"),
-        CategoriaAnimo(4, "Abrumado / Estresado"),
-        CategoriaAnimo(5, "Desanimado / Triste")
-    ),
+    val categorias: List<CategoriaAnimo> = emptyList(),
+    val historial: List<RegistroAnimo> = emptyList(),
     val categoriaSeleccionada: CategoriaAnimo? = null,
     val nivelIntensidad: Float = 3f,
     val contexto: String = "",
     val notaOpcional: String = "",
     val errorCategoria: String? = null,
     val errorContexto: String? = null,
-    val mensajeResultado: String? = null
+    val bannerExitoVisible: Boolean = false
 )
 
-class AnimoViewModel : ViewModel() {
-    var uiState by mutableStateOf(AnimoUiState())
-        private set
+class AnimoViewModel(application: Application) : AndroidViewModel(application) {
 
-    // Lista observable en memoria (Semana 8)
-    val historialAnimo = mutableStateListOf<RegistroAnimo>()
+    private val dao = AppDatabase.getDatabase(application).dailySyncDao()
+    private val notificationHelper = NotificationHelper(application)
+
+    private val _uiState = MutableStateFlow(AnimoUiState())
+    val uiState: StateFlow<AnimoUiState> = _uiState.asStateFlow()
+
+    init {
+        // Cargar Catálogo de Ánimo desde Room
+        viewModelScope.launch {
+            dao.obtenerCatalogoAnimo().collect { catalogoEntities ->
+                val categorias = catalogoEntities.map { entity ->
+                    CategoriaAnimo(id = entity.idCategoria, nombre = entity.nombreCategoria)
+                }
+                _uiState.update { it.copy(categorias = categorias) }
+            }
+        }
+
+        // Cargar Historial de Registros de Ánimo desde Room
+        viewModelScope.launch {
+            dao.obtenerRegistrosAnimo().collect { entidades ->
+                val catalogoMap = _uiState.value.categorias.associateBy { it.id }
+                val registros = entidades.map { entity ->
+                    RegistroAnimo(
+                        id = entity.idRegistro,
+                        usuarioId = entity.idUsuario,
+                        categoriaId = entity.idCategoria,
+                        categoriaNombre = catalogoMap[entity.idCategoria]?.nombre ?: "Ánimo #${entity.idCategoria}",
+                        fechaHora = entity.fechaHora,
+                        nivelIntensidad = entity.nivelIntensidad,
+                        contexto = entity.contexto,
+                        notaOpcional = entity.notaOpcional,
+                        pendienteSync = entity.pendienteSync
+                    )
+                }
+                _uiState.update { it.copy(historial = registros) }
+            }
+        }
+    }
 
     fun seleccionarCategoria(categoria: CategoriaAnimo) {
-        uiState = uiState.copy(categoriaSeleccionada = categoria, errorCategoria = null, mensajeResultado = null)
+        _uiState.update {
+            it.copy(
+                categoriaSeleccionada = categoria,
+                errorCategoria = null
+            )
+        }
     }
 
-    fun actualizarIntensidad(nuevaIntensidad: Float) {
-        uiState = uiState.copy(nivelIntensidad = nuevaIntensidad)
+    fun cambiarIntensidad(intensidad: Float) {
+        _uiState.update { it.copy(nivelIntensidad = intensidad) }
     }
 
-    fun actualizarContexto(nuevoContexto: String) {
-        uiState = uiState.copy(contexto = nuevoContexto, errorContexto = null, mensajeResultado = null)
+    fun cambiarContexto(contexto: String) {
+        _uiState.update {
+            it.copy(
+                contexto = contexto,
+                errorContexto = if (contexto.trim().length >= 3) null else it.errorContexto
+            )
+        }
     }
 
-    fun actualizarNota(nuevaNota: String) {
-        uiState = uiState.copy(notaOpcional = nuevaNota)
+    fun cambiarNota(nota: String) {
+        _uiState.update { it.copy(notaOpcional = nota) }
     }
 
-    // Retorna el ID creado si es válido, o null si hay errores
-    fun guardarRegistro(): String? {
+    fun ocultarBanner() {
+        _uiState.update { it.copy(bannerExitoVisible = false) }
+    }
+
+    fun guardarRegistro(): Boolean {
+        val currentState = _uiState.value
         var esValido = true
-        var errCat: String? = null
-        var errCtx: String? = null
 
-        // Validación 1: Campo obligatorio
-        if (uiState.categoriaSeleccionada == null) {
-            errCat = "Debes seleccionar un estado de ánimo"
+        var errCategoria: String? = null
+        var errContexto: String? = null
+
+        if (currentState.categoriaSeleccionada == null) {
+            errCategoria = "Debes seleccionar una categoría de estado de ánimo."
             esValido = false
         }
 
-        // Validación 2: Regla de longitud mínima
-        if (uiState.contexto.isBlank()) {
-            errCtx = "El contexto o entorno es obligatorio"
-            esValido = false
-        } else if (uiState.contexto.trim().length < 3) {
-            errCtx = "Usa al menos 3 caracteres para describir el contexto"
+        if (currentState.contexto.trim().length < 3) {
+            errContexto = "El contexto debe tener al menos 3 caracteres."
             esValido = false
         }
 
         if (!esValido) {
-            uiState = uiState.copy(errorCategoria = errCat, errorContexto = errCtx)
-            return null
+            _uiState.update {
+                it.copy(
+                    errorCategoria = errCategoria,
+                    errorContexto = errContexto
+                )
+            }
+            return false
         }
 
-        val nuevoRegistro = RegistroAnimo(
-            categoriaId = uiState.categoriaSeleccionada!!.id,
-            categoriaNombre = uiState.categoriaSeleccionada!!.nombre,
-            fechaHora = "2026-10-02 18:30",
-            nivelIntensidad = uiState.nivelIntensidad.toInt(),
-            contexto = uiState.contexto.trim(),
-            notaOpcional = uiState.notaOpcional.ifBlank { null }
+        val timestampActual = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
+        val nuevoId = UUID.randomUUID().toString()
+
+        val nuevaEntidad = RegistroAnimoEntity(
+            idRegistro = nuevoId,
+            idUsuario = "usr_demo_01",
+            idCategoria = currentState.categoriaSeleccionada!!.id,
+            fechaHora = timestampActual,
+            nivelIntensidad = currentState.nivelIntensidad.toInt(),
+            contexto = currentState.contexto.trim(),
+            notaOpcional = currentState.notaOpcional.ifBlank { null },
+            pendienteSync = true
         )
 
-        historialAnimo.add(nuevoRegistro)
+        viewModelScope.launch {
+            // Guardar asíncronamente en Room DB
+            dao.insertarRegistroAnimo(nuevaEntidad)
 
-        // Limpiar el formulario
-        uiState = AnimoUiState(mensajeResultado = "Registro guardado exitosamente")
-        return nuevoRegistro.id
-    }
+            // Emitir Notificación Nativa
+            notificationHelper.mostrarNotificacionCheckIn(
+                titulo = "Check-in Registrado",
+                mensaje = "Se guardó tu estado '${currentState.categoriaSeleccionada?.nombre}' en el dispositivo."
+            )
 
-    // Búsqueda desacoplada por ID para la pantalla de Detalle
-    fun buscarPorId(id: String): RegistroAnimo? {
-        return historialAnimo.firstOrNull { it.id == id }
+            // Actualizar UI
+            _uiState.update {
+                it.copy(
+                    categoriaSeleccionada = null,
+                    nivelIntensidad = 3f,
+                    contexto = "",
+                    notaOpcional = "",
+                    errorCategoria = null,
+                    errorContexto = null,
+                    bannerExitoVisible = true
+                )
+            }
+        }
+
+        return true
     }
 }

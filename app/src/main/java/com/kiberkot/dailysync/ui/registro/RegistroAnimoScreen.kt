@@ -1,68 +1,94 @@
 package com.kiberkot.dailysync.ui.registro
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.kiberkot.dailysync.ui.components.BotonPrincipal
-import com.kiberkot.dailysync.ui.components.CampoTextoFormulario
+import androidx.compose.ui.unit.sp
+import com.kiberkot.dailysync.model.CategoriaAnimo
+import com.kiberkot.dailysync.ui.componentes.CategoriaChipGrid
 import com.kiberkot.dailysync.viewmodel.AnimoUiState
 
 @Composable
 fun RegistroAnimoScreen(
     state: AnimoUiState,
-    onSeleccionarCategoria: (com.kiberkot.dailysync.model.CategoriaAnimo) -> Unit,
+    onSeleccionarCategoria: (CategoriaAnimo) -> Unit,
     onCambioIntensidad: (Float) -> Unit,
     onCambioContexto: (String) -> Unit,
     onCambioNota: (String) -> Unit,
     onGuardar: () -> Unit,
+    onOcultarBanner: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val emojis = listOf("🧘", "🚀", "⚡", "🌧️", "💔")
+
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         Text(
-            text = "Check-in de Estado de Ánimo",
-            style = MaterialTheme.typography.headlineSmall
-        )
-        Text(
-            text = "Registra tu percepción emocional actual (RF12)",
-            style = MaterialTheme.typography.bodyMedium
+            text = "Nuevo Check-in",
+            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
         )
 
-        // Selector de Categoría (RadioButtons con catálogo sintético)
-        Text(
-            text = "1. ¿Cómo te sientes en este momento?",
-            style = MaterialTheme.typography.titleMedium
-        )
-        state.categorias.forEach { categoria ->
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
+        AnimatedVisibility(
+            visible = state.bannerExitoVisible,
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = Color(0xFFE8F5E9),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                RadioButton(
-                    selected = state.categoriaSeleccionada?.id == categoria.id,
-                    onClick = { onSeleccionarCategoria(categoria) }
-                )
-                Text(text = categoria.nombre)
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF2E7D32))
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text("¡Guardado en Room DB!", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
+                    }
+                    TextButton(onClick = onOcultarBanner) {
+                        Text("Cerrar")
+                    }
+                }
             }
         }
+
+        Text(
+            text = "1. Selecciona tu estado emocional",
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+        )
+
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            state.categorias.forEachIndexed { index, cat ->
+                CategoriaChipGrid(
+                    categoria = cat,
+                    emoji = emojis.getOrElse(index) { "😊" },
+                    seleccionada = state.categoriaSeleccionada?.id == cat.id,
+                    onSelect = { onSeleccionarCategoria(cat) }
+                )
+            }
+        }
+
         if (state.errorCategoria != null) {
             Text(
                 text = state.errorCategoria,
@@ -71,49 +97,71 @@ fun RegistroAnimoScreen(
             )
         }
 
-        // Selector de Intensidad (Slider)
+        Card(
+            shape = RoundedCornerShape(22.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+        ) {
+            Column(modifier = Modifier.padding(18.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "2. Intensidad",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                    )
+                    Text(
+                        text = "${state.nivelIntensidad.toInt()} / 5",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                Slider(
+                    value = state.nivelIntensidad,
+                    onValueChange = onCambioIntensidad,
+                    valueRange = 1f..5f,
+                    steps = 3,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+        }
+
         Text(
-            text = "2. Nivel de intensidad: ${state.nivelIntensidad.toInt()} / 5",
-            style = MaterialTheme.typography.titleMedium
+            text = "3. Contexto del registro",
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
         )
-        Slider(
-            value = state.nivelIntensidad,
-            onValueChange = onCambioIntensidad,
-            valueRange = 1f..5f,
-            steps = 3,
+
+        OutlinedTextField(
+            value = state.contexto,
+            onValueChange = onCambioContexto,
+            label = { Text("¿Qué estás haciendo? (Mínimo 3 letras)") },
+            isError = state.errorContexto != null,
+            supportingText = {
+                state.errorContexto?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            },
+            shape = RoundedCornerShape(18.dp),
             modifier = Modifier.fillMaxWidth()
         )
 
-        // Componente Reutilizable 1: Campo de Contexto
-        CampoTextoFormulario(
-            valor = state.contexto,
-            etiqueta = "3. Contexto o entorno (Ej: Hogar, Trabajo, Estudio)",
-            error = state.errorContexto,
-            onValorChange = onCambioContexto
+        OutlinedTextField(
+            value = state.notaOpcional,
+            onValueChange = onCambioNota,
+            label = { Text("Nota opcional") },
+            minLines = 2,
+            shape = RoundedCornerShape(18.dp),
+            modifier = Modifier.fillMaxWidth()
         )
 
-        // Componente Reutilizable 1: Campo de Nota Opcional
-        CampoTextoFormulario(
-            valor = state.notaOpcional,
-            etiqueta = "4. Nota personal opcional",
-            error = null,
-            onValorChange = onCambioNota,
-            lineasMinimas = 3
-        )
-
-        // Componente Reutilizable 2: Botón Principal
-        BotonPrincipal(
-            texto = "Guardar Check-in",
-            onClick = onGuardar
-        )
-
-        // Retroalimentación de Éxito
-        state.mensajeResultado?.let { mensaje ->
-            Text(
-                text = mensaje,
-                color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.bodyLarge
-            )
+        Button(
+            onClick = onGuardar,
+            shape = RoundedCornerShape(18.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+        ) {
+            Text("Guardar Registro", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
     }
 }

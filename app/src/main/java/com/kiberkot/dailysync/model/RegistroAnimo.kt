@@ -1,22 +1,26 @@
 package com.kiberkot.dailysync.model
 
+import androidx.room.Entity
+import androidx.room.PrimaryKey
 import java.util.UUID
 
-// Catálogo sintético de Estado de Ánimo (Lemac DataLab)
+// Catálogo sintético de Estado de Ánimo
 data class CategoriaAnimo(
     val id: Int,
     val nombre: String
 )
 
-// Entidad principal del registro de ánimo
+// Entidad principal adaptada para la tabla de Room (Persistencia Local)
+@Entity(tableName = "registro_animo")
 data class RegistroAnimo(
+    @PrimaryKey
     val id: String = UUID.randomUUID().toString(),
-    val usuarioId: String = "usr_demo_01", // Usuario ficticio de prueba
+    val usuarioId: String = "usr_demo_01",
     val categoriaId: Int,
     val categoriaNombre: String,
-    val fechaHora: String, // Ej: "2026-10-02 18:00"
-    val nivelIntensidad: Int, // Escala 1 a 5
-    val contexto: String, // Ej: "Estudio", "Hogar", "Trabajo", "Social"
+    val fechaHora: String,
+    val nivelIntensidad: Int,
+    val contexto: String,
     val notaOpcional: String? = null,
     val pendienteSync: Boolean = true
 )
