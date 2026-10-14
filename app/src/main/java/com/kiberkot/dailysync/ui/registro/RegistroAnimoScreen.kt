@@ -18,7 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kiberkot.dailysync.model.CategoriaAnimo
-import com.kiberkot.dailysync.ui.componentes.CategoriaChipGrid
+import com.kiberkot.dailysync.ui.components.CategoriaChipGrid
 import com.kiberkot.dailysync.viewmodel.AnimoUiState
 
 @Composable

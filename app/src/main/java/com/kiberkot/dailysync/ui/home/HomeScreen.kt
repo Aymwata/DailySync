@@ -15,8 +15,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.kiberkot.dailysync.model.RegistroAnimo
-import com.kiberkot.dailysync.ui.componentes.TarjetaHeroDashboard
-import com.kiberkot.dailysync.ui.componentes.TarjetaRegistroAnimoPro
+import com.kiberkot.dailysync.ui.components.TarjetaHeroDashboard
+import com.kiberkot.dailysync.ui.components.TarjetaRegistroAnimoPro
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

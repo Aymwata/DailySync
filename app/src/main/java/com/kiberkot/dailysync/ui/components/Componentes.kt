@@ -1,4 +1,4 @@
-package com.kiberkot.dailysync.ui.componentes
+package com.kiberkot.dailysync.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
