@@ -27,6 +27,18 @@ interface DailySyncDao {
     @Query("SELECT * FROM CATALOGO_DBT")
     fun obtenerCatalogoDbt(): Flow<List<CatalogoDbtEntity>>
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertarCatalogoNeuro(lista: List<CatalogoNeuroEntity>)
+
+    @Query("SELECT * FROM CATALOGO_NEURO")
+    fun obtenerCatalogoNeuro(): Flow<List<CatalogoNeuroEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertarCatalogoAdiccion(lista: List<CatalogoAdiccionEntity>)
+
+    @Query("SELECT * FROM CATALOGO_ADICCION")
+    fun obtenerCatalogoAdiccion(): Flow<List<CatalogoAdiccionEntity>>
+
     // --- REGISTROS DE ÁNIMO ---
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertarRegistroAnimo(registro: RegistroAnimoEntity)
