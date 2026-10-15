@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -157,17 +158,13 @@ class AnimoViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(bannerExitoVisible = false) }
     }
 
-    fun guardarRegistro(): Boolean {
+    fun guardarRegistro(onExito: () -> Unit): Boolean {
         val currentState = _uiState.value
 
-        // Validación 1: Selección obligatoria de categoría emocional
         val errCategoria = if (currentState.categoriaSeleccionada == null) {
             "Debes seleccionar una categoría de estado de ánimo."
-        } else {
-            null
-        }
+        } else null
 
-        // Validación 2: Reglas de obligatoriedad y longitud para el contexto
         val contextoLimpio = currentState.contexto.trim()
         val errContexto = when {
             contextoLimpio.isBlank() -> "El contexto o entorno es obligatorio."
@@ -203,16 +200,22 @@ class AnimoViewModel(application: Application) : AndroidViewModel(application) {
         )
 
         viewModelScope.launch {
-            // Guardar asíncronamente en Room DB
+            // 1. Guardar en Room DB
             dao.insertarRegistroAnimo(nuevaEntidad)
 
-            // Emitir Notificación Nativa
+            // 2. Emitir Notificación Nativa discreta (RF06)
             notificationHelper.mostrarNotificacionCheckIn(
-                titulo = "Check-in Registrado",
-                mensaje = "Se guardó tu registro en DailySync correctamente."
+                titulo = "DailySync",
+                mensaje = "Nuevo check-in guardado localmente."
             )
 
-            // Limpiar formulario y mostrar confirmación
+            // 3. Encender el banner animado
+            _uiState.update { it.copy(bannerExitoVisible = true) }
+
+            // 4. Delay de 1.5 segundos para apreciar el feedback visual
+            delay(1500L)
+
+            // 5. Limpiar formulario
             _uiState.update {
                 it.copy(
                     categoriaSeleccionada = null,
@@ -221,9 +224,12 @@ class AnimoViewModel(application: Application) : AndroidViewModel(application) {
                     notaOpcional = "",
                     errorCategoria = null,
                     errorContexto = null,
-                    bannerExitoVisible = true
+                    bannerExitoVisible = false
                 )
             }
+
+            // 6. Redirigir al Historial
+            onExito()
         }
 
         return true

@@ -47,25 +47,19 @@ fun AppNavigation(
         composable(Destinos.REGISTRO) {
             RegistroAnimoScreen(
                 state = uiState,
-                onSeleccionarCategoria = { categoria: CategoriaAnimo ->
-                    viewModel.seleccionarCategoria(categoria)
-                },
-                onCambioIntensidad = { intensidad: Float ->
-                    viewModel.cambiarIntensidad(intensidad)
-                },
-                onCambioContexto = { contexto: String ->
-                    viewModel.cambiarContexto(contexto)
-                },
-                onCambioNota = { nota: String ->
-                    viewModel.cambiarNota(nota)
-                },
+                onSeleccionarCategoria = viewModel::seleccionarCategoria,
+                onCambioIntensidad = viewModel::cambiarIntensidad,
+                onCambioContexto = viewModel::cambiarContexto,
+                onCambioNota = viewModel::cambiarNota,
                 onGuardar = {
-                    val guardadoExitoso = viewModel.guardarRegistro()
-                    if (guardadoExitoso) {
-                        navController.popBackStack()
-                    }
+                    viewModel.guardarRegistro(
+                        onExito = {
+                            navController.popBackStack()
+                        }
+                    )
                 },
-                onOcultarBanner = { viewModel.ocultarBanner() }
+                onOcultarBanner = viewModel::ocultarBanner,
+                onVolver = { navController.popBackStack() }
             )
         }
 
