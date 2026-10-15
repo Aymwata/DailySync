@@ -238,4 +238,11 @@ class AnimoViewModel(application: Application) : AndroidViewModel(application) {
     fun buscarPorId(id: String): RegistroAnimo? {
         return _uiState.value.historial.firstOrNull { it.id == id }
     }
+
+    fun eliminarRegistro(id: String, onEliminado: () -> Unit) {
+        viewModelScope.launch {
+            dao.eliminarRegistroAnimoPorId(id)
+            onEliminado()
+        }
+    }
 }

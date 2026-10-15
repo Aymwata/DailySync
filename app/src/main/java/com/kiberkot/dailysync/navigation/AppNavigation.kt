@@ -68,11 +68,17 @@ fun AppNavigation(
             arguments = listOf(navArgument("registroId") { type = NavType.StringType })
         ) { backStackEntry: NavBackStackEntry ->
             val registroId = backStackEntry.arguments?.getString("registroId")
-            val registroEncontrado: RegistroAnimo? = uiState.historial.find { reg: RegistroAnimo -> reg.id == registroId }
+            val registroEncontrado: RegistroAnimo? =
+                uiState.historial.find { reg: RegistroAnimo -> reg.id == registroId }
 
             DetalleScreen(
                 registro = registroEncontrado,
-                onVolver = { navController.popBackStack() }
+                onVolver = { navController.popBackStack() },
+                onEliminar = { id ->
+                    viewModel.eliminarRegistro(id) {
+                        navController.popBackStack()
+                    }
+                }
             )
         }
     }

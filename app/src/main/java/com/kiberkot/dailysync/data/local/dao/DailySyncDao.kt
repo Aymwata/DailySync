@@ -49,6 +49,9 @@ interface DailySyncDao {
     @Query("SELECT * FROM REGISTRO_ANIMO WHERE pendiente_sync = 1")
     suspend fun obtenerAnimoPendientesSync(): List<RegistroAnimoEntity>
 
+    @Query("DELETE FROM REGISTRO_ANIMO WHERE id_registro = :idRegistro")
+    suspend fun eliminarRegistroAnimoPorId(idRegistro: String)
+
     // --- REGISTROS DE DBT ---
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertarRegistroDbt(registro: RegistroDbtEntity)
