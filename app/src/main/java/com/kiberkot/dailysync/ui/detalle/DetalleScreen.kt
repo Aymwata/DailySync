@@ -20,6 +20,7 @@ fun DetalleScreen(
     registro: RegistroAnimo?,
     onVolver: () -> Unit,
     onEliminar: (String) -> Unit,
+    onEditar: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var mostrarDialogoEliminar by remember { mutableStateOf(false) }
@@ -157,6 +158,16 @@ fun DetalleScreen(
 
                 Spacer(modifier = Modifier.weight(1f))
 
+                Button(
+                    onClick = { onEditar(registro.id) },
+                    shape = RoundedCornerShape(18.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                ) {
+                    Text("Editar Registro", fontWeight = FontWeight.Bold)
+                }
+
                 OutlinedButton(
                     onClick = { mostrarDialogoEliminar = true },
                     shape = RoundedCornerShape(18.dp),
@@ -169,6 +180,8 @@ fun DetalleScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Eliminar Registro", fontWeight = FontWeight.Bold)
                 }
+
+
             }
         }
     }

@@ -245,4 +245,37 @@ class AnimoViewModel(application: Application) : AndroidViewModel(application) {
             onEliminado()
         }
     }
+
+    // Actualizar un registro existente en Room DB
+    fun actualizarRegistro(
+        idRegistro: String,
+        fechaHoraOriginal: String,
+        categoria: CategoriaAnimo,
+        intensidad: Int,
+        contexto: String,
+        nota: String?,
+        onExito: () -> Unit
+    ): Boolean {
+        val contextoLimpio = contexto.trim()
+        if (contextoLimpio.isBlank() || contextoLimpio.length < 3 || contextoLimpio.length > 60) {
+            return false
+        }
+
+        val entidadActualizada = RegistroAnimoEntity(
+            idRegistro = idRegistro,
+            idUsuario = "usr_demo_01",
+            idCategoria = categoria.id,
+            fechaHora = fechaHoraOriginal,
+            nivelIntensidad = intensidad,
+            contexto = contextoLimpio,
+            notaOpcional = nota?.trim()?.ifBlank { null },
+            pendienteSync = true
+        )
+
+        viewModelScope.launch {
+            dao.actualizarRegistroAnimo(entidadActualizada)
+            onExito()
+        }
+        return true
+    }
 }

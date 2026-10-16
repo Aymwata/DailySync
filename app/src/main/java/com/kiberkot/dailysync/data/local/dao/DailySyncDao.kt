@@ -52,6 +52,9 @@ interface DailySyncDao {
     @Query("DELETE FROM REGISTRO_ANIMO WHERE id_registro = :idRegistro")
     suspend fun eliminarRegistroAnimoPorId(idRegistro: String)
 
+    @Update
+    suspend fun actualizarRegistroAnimo(registro: RegistroAnimoEntity)
+
     // --- REGISTROS DE DBT ---
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertarRegistroDbt(registro: RegistroDbtEntity)
