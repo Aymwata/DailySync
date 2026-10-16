@@ -1,6 +1,7 @@
 package com.kiberkot.dailysync.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -15,10 +16,16 @@ import com.kiberkot.dailysync.model.CategoriaAnimo
 import com.kiberkot.dailysync.model.RegistroAnimo
 import com.kiberkot.dailysync.ui.detalle.DetalleScreen
 import com.kiberkot.dailysync.ui.home.HomeScreen
+import com.kiberkot.dailysync.ui.login.LoginScreen
+import com.kiberkot.dailysync.ui.login.RegisterScreen
 import com.kiberkot.dailysync.ui.registro.RegistroAnimoScreen
 import com.kiberkot.dailysync.viewmodel.AnimoViewModel
+import com.kiberkot.dailysync.viewmodel.LoginViewModel
+import com.kiberkot.dailysync.viewmodel.RegisterViewModel
 
 object Destinos {
+    const val LOGIN = "login"
+    const val REGISTER = "register"
     const val HOME = "home"
     const val REGISTRO = "registro"
     const val DETALLE = "detalle/{registroId}"
@@ -28,37 +35,81 @@ object Destinos {
 @Composable
 fun AppNavigation(
     navController: NavHostController = rememberNavController(),
-    viewModel: AnimoViewModel = viewModel()
+    animoViewModel: AnimoViewModel = viewModel(),
+    loginViewModel: LoginViewModel = viewModel(),
+    registerViewModel: RegisterViewModel = viewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val animoUiState by animoViewModel.uiState.collectAsState()
+    val loginUiState by loginViewModel.uiState.collectAsState()
+    val registerUiState by registerViewModel.uiState.collectAsState()
+
+    // Redirección al Home al autenticarse correctamente
+    LaunchedEffect(loginUiState.loginExitoso) {
+        if (loginUiState.loginExitoso) {
+            navController.navigate(Destinos.HOME) {
+                popUpTo(Destinos.LOGIN) { inclusive = true }
+            }
+            loginViewModel.resetearEstadoLogin()
+        }
+    }
+
+    // Redirección al Login al registrarse correctamente
+    LaunchedEffect(registerUiState.registroExitoso) {
+        if (registerUiState.registroExitoso) {
+            navController.popBackStack()
+            registerViewModel.resetearEstado()
+        }
+    }
 
     NavHost(
         navController = navController,
-        startDestination = Destinos.HOME
+        startDestination = Destinos.LOGIN
     ) {
-        composable(Destinos.HOME) {
+        composable(route = Destinos.LOGIN) {
+            LoginScreen(
+                state = loginUiState,
+                onCambioUsuario = loginViewModel::cambiarUsuario,
+                onCambioPassword = loginViewModel::cambiarPassword,
+                onTogglePasswordVisibility = loginViewModel::conmutarVisibilidadPassword,
+                onIniciarSesion = { loginViewModel.ejecutarLogin() },
+                onIrARegistro = { navController.navigate(Destinos.REGISTER) }
+            )
+        }
+
+        composable(route = Destinos.REGISTER) {
+            RegisterScreen(
+                state = registerUiState,
+                onCambioId = registerViewModel::cambiarIdUsuario,
+                onCambioAlias = registerViewModel::cambiarAlias,
+                onCambioCorreo = registerViewModel::cambiarCorreo,
+                onCambioPassword = registerViewModel::cambiarPassword,
+                onTogglePasswordVisibility = registerViewModel::conmutarVisibilidadPassword,
+                onRegistrar = { registerViewModel.registrarUsuario() },
+                onVolverLogin = { navController.popBackStack() }
+            )
+        }
+
+        composable(route = Destinos.HOME) {
             HomeScreen(
-                historial = uiState.historial,
+                historial = animoUiState.historial,
                 onNuevoRegistro = { navController.navigate(Destinos.REGISTRO) },
                 onVerDetalle = { id: String -> navController.navigate(Destinos.crearRutaDetalle(id)) }
             )
         }
 
-        composable(Destinos.REGISTRO) {
+        composable(route = Destinos.REGISTRO) {
             RegistroAnimoScreen(
-                state = uiState,
-                onSeleccionarCategoria = viewModel::seleccionarCategoria,
-                onCambioIntensidad = viewModel::cambiarIntensidad,
-                onCambioContexto = viewModel::cambiarContexto,
-                onCambioNota = viewModel::cambiarNota,
+                state = animoUiState,
+                onSeleccionarCategoria = animoViewModel::seleccionarCategoria,
+                onCambioIntensidad = animoViewModel::cambiarIntensidad,
+                onCambioContexto = animoViewModel::cambiarContexto,
+                onCambioNota = animoViewModel::cambiarNota,
                 onGuardar = {
-                    viewModel.guardarRegistro(
-                        onExito = {
-                            navController.popBackStack()
-                        }
+                    animoViewModel.guardarRegistro(
+                        onExito = { navController.popBackStack() }
                     )
                 },
-                onOcultarBanner = viewModel::ocultarBanner,
+                onOcultarBanner = animoViewModel::ocultarBanner,
                 onVolver = { navController.popBackStack() }
             )
         }
@@ -69,13 +120,13 @@ fun AppNavigation(
         ) { backStackEntry: NavBackStackEntry ->
             val registroId = backStackEntry.arguments?.getString("registroId")
             val registroEncontrado: RegistroAnimo? =
-                uiState.historial.find { reg: RegistroAnimo -> reg.id == registroId }
+                animoUiState.historial.find { reg: RegistroAnimo -> reg.id == registroId }
 
             DetalleScreen(
                 registro = registroEncontrado,
                 onVolver = { navController.popBackStack() },
                 onEliminar = { id ->
-                    viewModel.eliminarRegistro(id) {
+                    animoViewModel.eliminarRegistro(id) {
                         navController.popBackStack()
                     }
                 }

@@ -23,7 +23,7 @@ import kotlinx.coroutines.launch
         CatalogoAdiccionEntity::class,
         RegistroAdiccionEntity::class
     ],
-    version = 1,
+    version = 2, // 1. Se incrementa la versión por el cambio en la tabla
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -41,6 +41,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "dailysync_offline_db"
                 )
+                    .fallbackToDestructiveMigration() // 2. Permite recrear la base de datos limpiamente
                     .addCallback(PrepopulateCallback(context))
                     .build()
                 INSTANCE = instance
@@ -55,11 +56,12 @@ abstract class AppDatabase : RoomDatabase() {
                 CoroutineScope(Dispatchers.IO).launch {
                     val dao = getDatabase(context).dailySyncDao()
 
-                    // 1. Usuario Ficticio de Prueba
+                    // 1. Usuario Ficticio de Prueba (con campo correo incluido)
                     dao.insertarUsuario(
                         UsuarioPruebaEntity(
                             idUsuario = "usr_demo_01",
                             aliasFicticio = "UsuarioPrueba",
+                            correo = "demo@dailysync.app",
                             tokenSesion = "token_ficticio_123",
                             recordatorioActivo = true,
                             horaRecordatorio = "20:00"

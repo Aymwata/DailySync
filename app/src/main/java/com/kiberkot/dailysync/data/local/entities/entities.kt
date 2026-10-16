@@ -11,6 +11,7 @@ import androidx.room.PrimaryKey
 data class UsuarioPruebaEntity(
     @PrimaryKey @ColumnInfo(name = "id_usuario") val idUsuario: String,
     @ColumnInfo(name = "alias_ficticio") val aliasFicticio: String,
+    @ColumnInfo(name = "correo") val correo: String = "",
     @ColumnInfo(name = "token_sesion") val tokenSesion: String? = null,
     @ColumnInfo(name = "recordatorio_activo") val recordatorioActivo: Boolean = false,
     @ColumnInfo(name = "hora_recordatorio") val horaRecordatorio: String? = null
