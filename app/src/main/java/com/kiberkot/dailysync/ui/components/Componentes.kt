@@ -228,3 +228,31 @@ fun TarjetaRegistroAnimoPro(
         }
     }
 }
+
+// 4. CAMPO DE FORMULARIO REUTILIZABLE CON VALIDACIÓN
+@Composable
+fun CampoTextoFormulario(
+    valor: String,
+    etiqueta: String,
+    error: String?,
+    onValorChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    lineasMinimas: Int = 1
+) {
+    OutlinedTextField(
+        value = valor,
+        onValueChange = onValorChange,
+        label = { Text(etiqueta) },
+        isError = error != null,
+        supportingText = {
+            if (error != null) {
+                Text(
+                    text = error,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        },
+        minLines = lineasMinimas,
+        modifier = modifier.fillMaxWidth()
+    )
+}
