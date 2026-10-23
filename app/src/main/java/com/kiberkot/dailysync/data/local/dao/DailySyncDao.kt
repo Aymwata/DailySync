@@ -62,6 +62,33 @@ interface DailySyncDao {
     @Query("SELECT * FROM REGISTRO_DBT ORDER BY fecha_hora DESC")
     fun obtenerRegistrosDbt(): Flow<List<RegistroDbtEntity>>
 
+    // Actualiza los textos existentes sin borrar la habilidad ni sus prácticas asociadas.
+    @Upsert
+    suspend fun asegurarCatalogoDbt(habilidades: List<CatalogoDbtEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun asegurarUsuarioDbt(usuario: UsuarioPruebaEntity)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun crearPracticaDbt(registro: RegistroDbtEntity)
+
+    @Query("SELECT * FROM REGISTRO_DBT WHERE id_registro = :id AND id_usuario = :usuarioId LIMIT 1")
+    fun observarPracticaDbt(id: String, usuarioId: String): Flow<RegistroDbtEntity?>
+
+    @Query("SELECT * FROM CATALOGO_DBT WHERE id_habilidad = :id LIMIT 1")
+    suspend fun buscarHabilidadDbt(id: Int): CatalogoDbtEntity?
+
+    @Query("""
+        UPDATE REGISTRO_DBT SET id_habilidad = :habilidadId,
+            situacion_asociada = :situacion, nivel_intensidad = :intensidad,
+            utilidad_percibida = :utilidad, pendiente_sync = 1
+        WHERE id_registro = :id AND id_usuario = :usuarioId
+    """)
+    suspend fun actualizarPracticaDbt(
+        id: String, usuarioId: String, habilidadId: Int,
+        situacion: String, intensidad: Int, utilidad: Int
+    ): Int
+
     // --- REGISTROS DE NEURODESARROLLO ---
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertarRegistroNeuro(registro: RegistroNeuroEntity)
@@ -75,4 +102,80 @@ interface DailySyncDao {
 
     @Query("SELECT * FROM REGISTRO_ADICCION ORDER BY fecha_hora DESC")
     fun obtenerRegistrosAdiccion(): Flow<List<RegistroAdiccionEntity>>
+
+    // --- HISTORIAL POR USUARIO ---
+
+    @Query("""
+    SELECT * FROM REGISTRO_ANIMO
+    WHERE id_usuario = :usuarioId
+    ORDER BY fecha_hora DESC
+""")
+    fun observarAnimoPorUsuario(
+        usuarioId: String
+    ): Flow<List<RegistroAnimoEntity>>
+
+    @Query("""
+    SELECT * FROM REGISTRO_DBT
+    WHERE id_usuario = :usuarioId
+    ORDER BY fecha_hora DESC
+""")
+    fun observarDbtPorUsuario(
+        usuarioId: String
+    ): Flow<List<RegistroDbtEntity>>
+
+    @Query("""
+    SELECT * FROM REGISTRO_NEURO
+    WHERE id_usuario = :usuarioId
+    ORDER BY fecha_hora DESC
+""")
+    fun observarNeuroPorUsuario(
+        usuarioId: String
+    ): Flow<List<RegistroNeuroEntity>>
+
+    @Query("""
+    SELECT * FROM REGISTRO_ADICCION
+    WHERE id_usuario = :usuarioId
+    ORDER BY fecha_hora DESC
+""")
+    fun observarAdiccionesPorUsuario(
+        usuarioId: String
+    ): Flow<List<RegistroAdiccionEntity>>
+
+    // --- ELIMINACIÓN DESDE EL HISTORIAL ---
+
+    @Query("""
+    DELETE FROM REGISTRO_ANIMO
+    WHERE id_registro = :id AND id_usuario = :usuarioId
+""")
+    suspend fun eliminarAnimoDelUsuario(
+        id: String,
+        usuarioId: String
+    ): Int
+
+    @Query("""
+    DELETE FROM REGISTRO_DBT
+    WHERE id_registro = :id AND id_usuario = :usuarioId
+""")
+    suspend fun eliminarDbtDelUsuario(
+        id: String,
+        usuarioId: String
+    ): Int
+
+    @Query("""
+    DELETE FROM REGISTRO_NEURO
+    WHERE id_registro = :id AND id_usuario = :usuarioId
+""")
+    suspend fun eliminarNeuroDelUsuario(
+        id: String,
+        usuarioId: String
+    ): Int
+
+    @Query("""
+    DELETE FROM REGISTRO_ADICCION
+    WHERE id_registro = :id AND id_usuario = :usuarioId
+""")
+    suspend fun eliminarAdiccionDelUsuario(
+        id: String,
+        usuarioId: String
+    ): Int
 }

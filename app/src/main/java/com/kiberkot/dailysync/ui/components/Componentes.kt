@@ -22,6 +22,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kiberkot.dailysync.model.CategoriaAnimo
 import com.kiberkot.dailysync.model.RegistroAnimo
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.ui.platform.testTag
 
 // 1. CHIP / TARJETA SELECCIONABLE EN CUADRÍCULA
 @Composable
@@ -255,4 +259,44 @@ fun CampoTextoFormulario(
         minLines = lineasMinimas,
         modifier = modifier.fillMaxWidth()
     )
+}
+
+/** Estructura visual compartida por las pantallas del módulo. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun DbtScaffold(titulo: String, onVolver: () -> Unit, ocupado: Boolean = false, contenido: LazyListScope.() -> Unit) {
+    Scaffold(topBar = {
+        TopAppBar(title = {
+            Column {
+                Text("Habilidades DBT", style = MaterialTheme.typography.labelMedium)
+                Text(titulo, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            }
+        }, navigationIcon = {
+            IconButton(onClick = onVolver, enabled = !ocupado) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+            }
+        })
+    }) { padding ->
+        LazyColumn(Modifier.fillMaxSize().padding(padding).testTag("dbt_contenido"), contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp), content = contenido)
+    }
+}
+
+@Composable
+internal fun DbtSeccion(titulo: String, contenido: @Composable ColumnScope.() -> Unit) {
+    ElevatedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(titulo, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            contenido()
+        }
+    }
+}
+
+@Composable
+internal fun DbtError(error: String, onReintentar: () -> Unit, habilitado: Boolean = true) {
+    Column {
+        Text(error, color = MaterialTheme.colorScheme.error)
+        TextButton(onClick = onReintentar, enabled = habilitado) { Text("Reintentar") }
+    }
 }

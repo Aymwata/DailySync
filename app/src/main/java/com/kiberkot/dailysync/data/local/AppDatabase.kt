@@ -31,6 +31,81 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun dailySyncDao(): DailySyncDao
 
     companion object {
+        // Contenido educativo resumido; los ejemplos son ficticios.
+        // Referencias: VA MIRECC (Mente Sabia), DBT Self Help (STOP y DEAR MAN),
+        // Mindful Teen (Acción Opuesta). Enlaces completos en docs/Modulo-DBT.md.
+        val catalogoDbtInicial = listOf(
+            CatalogoDbtEntity(
+                idHabilidad = 1,
+                nombreHabilidad = "Mente Sabia",
+                moduloDbt = "Mindfulness / Atención plena",
+                contenidoPsicoeducativo = """
+                    Consiste en tomar una decisión considerando tanto lo que sientes como los hechos y tus objetivos.
+
+                    Para practicar:
+                    1. Pon nombre a tu emoción y al impulso que aparece.
+                    2. Separa los hechos comprobables de tus suposiciones.
+                    3. Elige una respuesta que tenga en cuenta tus necesidades y las consecuencias.
+
+                    Ejemplo ficticio:
+                    Un compañero tarda en responder. Sientes molestia y quieres reclamar. Reconoces que no sabes por qué tarda y decides preguntar con calma antes de sacar conclusiones.
+                """.trimIndent()
+            ),
+            CatalogoDbtEntity(
+                idHabilidad = 2,
+                nombreHabilidad = "STOP",
+                moduloDbt = "Tolerancia al Malestar",
+                contenidoPsicoeducativo = """
+                    Es una pausa breve antes de actuar por impulso. Su nombre recuerda cuatro pasos.
+
+                    Para practicar:
+                    1. S — Detente: deja pasar un momento antes de responder.
+                    2. T — Toma distancia: haz una pausa y respira.
+                    3. O — Observa: identifica qué ocurre, qué piensas y qué sientes.
+                    4. P — Procede con atención: elige una acción acorde con tu objetivo.
+
+                    Ejemplo ficticio:
+                    Recibes un mensaje que te molesta. Antes de contestar, apartas el teléfono, reconoces tu enojo y decides responder cuando puedas expresar tu idea con claridad.
+                """.trimIndent()
+            ),
+            CatalogoDbtEntity(
+                idHabilidad = 3,
+                nombreHabilidad = "DEAR MAN",
+                moduloDbt = "Efectividad Interpersonal",
+                contenidoPsicoeducativo = """
+                    Es una guía para pedir algo o decir que no de forma clara y respetuosa. Cada letra recuerda una parte de la conversación.
+
+                    Para practicar:
+                    D — Describe los hechos sin acusaciones.
+                    E — Expresa cómo te afecta la situación.
+                    A — Pide claramente lo que necesitas o comunica tu límite.
+                    R — Explica el beneficio de llegar a un acuerdo.
+                    M — Mantén el foco en tu objetivo.
+                    A — Adopta un tono seguro y respetuoso.
+                    N — Negocia alternativas posibles.
+
+                    Ejemplo ficticio:
+                    «Aún no recibo tu parte del trabajo. Me preocupa el plazo. ¿Podrías enviarla a las seis? Así podremos revisarla juntos. Si no puedes, acordemos otro reparto».
+                """.trimIndent()
+            ),
+            CatalogoDbtEntity(
+                idHabilidad = 4,
+                nombreHabilidad = "Acción Opuesta",
+                moduloDbt = "Regulación Emocional",
+                contenidoPsicoeducativo = """
+                    Consiste en elegir una conducta distinta al impulso de una emoción cuando ese impulso no ayuda a tus objetivos o la emoción no se ajusta a los hechos.
+
+                    Para practicar:
+                    1. Identifica la emoción y lo que te impulsa a hacer.
+                    2. Revisa los hechos y comprueba que la situación es segura.
+                    3. Si seguir el impulso no te ayuda, elige una acción opuesta, pequeña y concreta.
+
+                    Ejemplo ficticio:
+                    Te da vergüenza hacer una pregunta en clase, aunque el profesor invita a preguntar. En vez de callarte, levantas la mano y haces una pregunta breve.
+                """.trimIndent()
+            )
+        )
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -80,34 +155,7 @@ abstract class AppDatabase : RoomDatabase() {
                     )
 
                     // 3. Catálogo de Habilidades DBT
-                    dao.insertarCatalogoDbt(
-                        listOf(
-                            CatalogoDbtEntity(
-                                1,
-                                "Mente Sabia",
-                                "Mindfulness",
-                                "Integra emoción y razón antes de actuar."
-                            ),
-                            CatalogoDbtEntity(
-                                2,
-                                "STOP",
-                                "Tolerancia al Malestar",
-                                "Detente, da un paso atrás y observa."
-                            ),
-                            CatalogoDbtEntity(
-                                3,
-                                "DEAR MAN",
-                                "Efectividad Interpersonal",
-                                "Comunica necesidades de forma asertiva."
-                            ),
-                            CatalogoDbtEntity(
-                                4,
-                                "Acción Opuesta",
-                                "Regulación Emocional",
-                                "Actúa en dirección opuesta al impulso emocional."
-                            )
-                        )
-                    )
+                    dao.asegurarCatalogoDbt(catalogoDbtInicial)
 
                     // 4. Catálogo de Estrategias de Neurodesarrollo
                     dao.insertarCatalogoNeuro(
