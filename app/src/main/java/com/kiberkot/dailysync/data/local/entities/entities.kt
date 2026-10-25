@@ -6,17 +6,17 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
-// 1. USUARIO_PRUEBA
+
 @Entity(tableName = "USUARIO_PRUEBA")
 data class UsuarioPruebaEntity(
     @PrimaryKey @ColumnInfo(name = "id_usuario") val idUsuario: String,
     @ColumnInfo(name = "alias_ficticio") val aliasFicticio: String,
     @ColumnInfo(name = "correo") val correo: String = "",
+    @ColumnInfo(name = "password") val password: String = "", // <--- Campo agregado
     @ColumnInfo(name = "token_sesion") val tokenSesion: String? = null,
     @ColumnInfo(name = "recordatorio_activo") val recordatorioActivo: Boolean = false,
     @ColumnInfo(name = "hora_recordatorio") val horaRecordatorio: String? = null
 )
-
 // --- MÓDULO ESTADO DE ÁNIMO ---
 // 2. CATALOGO_ANIMO
 @Entity(tableName = "CATALOGO_ANIMO")

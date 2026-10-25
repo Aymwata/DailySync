@@ -6,7 +6,8 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface DailySyncDao {
-
+    @Query("SELECT * FROM USUARIO_PRUEBA WHERE id_usuario = :busqueda OR correo = :busqueda LIMIT 1")
+    suspend fun obtenerUsuarioPorIdOCorreo(busqueda: String): UsuarioPruebaEntity?
     // --- USUARIO Y SESIÓN ---
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertarUsuario(usuario: UsuarioPruebaEntity)

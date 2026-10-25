@@ -6,7 +6,18 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.kiberkot.dailysync.data.local.dao.DailySyncDao
-import com.kiberkot.dailysync.data.local.entities.*
+
+// --- IMPORTS EXPLÍCITOS DE ENTIDADES ---
+import com.kiberkot.dailysync.data.local.entities.UsuarioPruebaEntity
+import com.kiberkot.dailysync.data.local.entities.CatalogoAnimoEntity
+import com.kiberkot.dailysync.data.local.entities.RegistroAnimoEntity
+import com.kiberkot.dailysync.data.local.entities.CatalogoDbtEntity
+import com.kiberkot.dailysync.data.local.entities.RegistroDbtEntity
+import com.kiberkot.dailysync.data.local.entities.CatalogoNeuroEntity
+import com.kiberkot.dailysync.data.local.entities.RegistroNeuroEntity
+import com.kiberkot.dailysync.data.local.entities.CatalogoAdiccionEntity
+import com.kiberkot.dailysync.data.local.entities.RegistroAdiccionEntity
+
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -23,7 +34,7 @@ import kotlinx.coroutines.launch
         CatalogoAdiccionEntity::class,
         RegistroAdiccionEntity::class
     ],
-    version = 2, // 1. Se incrementa la versión por el cambio en la tabla
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -31,9 +42,15 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun dailySyncDao(): DailySyncDao
 
     companion object {
-        // Contenido educativo resumido; los ejemplos son ficticios.
-        // Referencias: VA MIRECC (Mente Sabia), DBT Self Help (STOP y DEAR MAN),
-        // Mindful Teen (Acción Opuesta). Enlaces completos en docs/Modulo-DBT.md.
+
+        val catalogoAnimoInicial = listOf(
+            CatalogoAnimoEntity(1, "Tranquilo / Calmo"),
+            CatalogoAnimoEntity(2, "Motivado / Con energía"),
+            CatalogoAnimoEntity(3, "Ansioso / Inquieto"),
+            CatalogoAnimoEntity(4, "Abrumado / Estresado"),
+            CatalogoAnimoEntity(5, "Desanimado / Triste")
+        )
+
         val catalogoDbtInicial = listOf(
             CatalogoDbtEntity(
                 idHabilidad = 1,
@@ -106,6 +123,19 @@ abstract class AppDatabase : RoomDatabase() {
             )
         )
 
+        val catalogoNeuroInicial = listOf(
+            CatalogoNeuroEntity(1, "Pausa sensorial / Aislamiento acústico"),
+            CatalogoNeuroEntity(2, "Desglose en microtareas (Pomodoro)"),
+            CatalogoNeuroEntity(3, "Respiración cuadrada 4x4"),
+            CatalogoNeuroEntity(4, "Uso de apoyos visuales / Checklist")
+        )
+
+        val catalogoAdiccionInicial = listOf(
+            CatalogoAdiccionEntity(idAccionProtectora = 1, nombreAccion = "Surfear el impulso (Urge Surfing - 10 min)"),
+            CatalogoAdiccionEntity(idAccionProtectora = 2, nombreAccion = "Contacto con red de apoyo"),
+            CatalogoAdiccionEntity(idAccionProtectora = 3, nombreAccion = "Cambio de entorno / Actividad física breve"),
+            CatalogoAdiccionEntity(idAccionProtectora = 4, nombreAccion = "Distracción cognitiva inmediata")
+        )
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -116,66 +146,39 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "dailysync_offline_db"
                 )
-                    .fallbackToDestructiveMigration() // 2. Permite recrear la base de datos limpiamente
-                    .addCallback(PrepopulateCallback(context))
+                    .fallbackToDestructiveMigration()
+                    .addCallback(PrepopulateCallback())
                     .build()
                 INSTANCE = instance
                 instance
             }
         }
 
-        // Carga inicial de datos ficticios y catálogos sintéticos (Lemac DataLab)
-        private class PrepopulateCallback(private val context: Context) : RoomDatabase.Callback() {
+        private class PrepopulateCallback : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
-                CoroutineScope(Dispatchers.IO).launch {
-                    val dao = getDatabase(context).dailySyncDao()
+                INSTANCE?.let { database ->
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val dao = database.dailySyncDao()
 
-                    // 1. Usuario Ficticio de Prueba (con campo correo incluido)
-                    dao.insertarUsuario(
-                        UsuarioPruebaEntity(
-                            idUsuario = "usr_demo_01",
-                            aliasFicticio = "UsuarioPrueba",
-                            correo = "demo@dailysync.app",
-                            tokenSesion = "token_ficticio_123",
-                            recordatorioActivo = true,
-                            horaRecordatorio = "20:00"
+                        // Usuario Ficticio de Prueba Inicial (Contraseña: 1234)
+                        dao.insertarUsuario(
+                            UsuarioPruebaEntity(
+                                idUsuario = "usr_demo_01",
+                                aliasFicticio = "UsuarioPrueba",
+                                correo = "demo@dailysync.app",
+                                password = "1234",
+                                tokenSesion = "token_ficticio_123",
+                                recordatorioActivo = true,
+                                horaRecordatorio = "20:00"
+                            )
                         )
-                    )
 
-                    // 2. Catálogo de Estado de Ánimo
-                    dao.insertarCatalogoAnimo(
-                        listOf(
-                            CatalogoAnimoEntity(1, "Tranquilo / Calmo"),
-                            CatalogoAnimoEntity(2, "Motivado / Con energía"),
-                            CatalogoAnimoEntity(3, "Ansioso / Inquieto"),
-                            CatalogoAnimoEntity(4, "Abrumado / Estresado"),
-                            CatalogoAnimoEntity(5, "Desanimado / Triste")
-                        )
-                    )
-
-                    // 3. Catálogo de Habilidades DBT
-                    dao.asegurarCatalogoDbt(catalogoDbtInicial)
-
-                    // 4. Catálogo de Estrategias de Neurodesarrollo
-                    dao.insertarCatalogoNeuro(
-                        listOf(
-                            CatalogoNeuroEntity(1, "Pausa sensorial / Aislamiento acústico"),
-                            CatalogoNeuroEntity(2, "Desglose en microtareas (Pomodoro)"),
-                            CatalogoNeuroEntity(3, "Respiración cuadrada 4x4"),
-                            CatalogoNeuroEntity(4, "Uso de apoyos visuales / Checklist")
-                        )
-                    )
-
-                    // 5. Catálogo de Acciones Protectoras (Adicciones)
-                    dao.insertarCatalogoAdiccion(
-                        listOf(
-                            CatalogoAdiccionEntity(1, "Surfear el impulso (Urge Surfing - 10 min)"),
-                            CatalogoAdiccionEntity(2, "Contacto con red de apoyo"),
-                            CatalogoAdiccionEntity(3, "Cambio de entorno / Actividad física breve"),
-                            CatalogoAdiccionEntity(4, "Distracción cognitiva inmediata")
-                        )
-                    )
+                        dao.insertarCatalogoAnimo(catalogoAnimoInicial)
+                        dao.asegurarCatalogoDbt(catalogoDbtInicial)
+                        dao.insertarCatalogoNeuro(catalogoNeuroInicial)
+                        dao.insertarCatalogoAdiccion(catalogoAdiccionInicial)
+                    }
                 }
             }
         }

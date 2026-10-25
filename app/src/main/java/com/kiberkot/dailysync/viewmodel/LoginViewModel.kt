@@ -4,7 +4,6 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.kiberkot.dailysync.data.local.AppDatabase
-import com.kiberkot.dailysync.data.local.entities.UsuarioPruebaEntity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -50,19 +49,19 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(isPasswordVisible = !it.isPasswordVisible) }
     }
 
-    fun ejecutarLogin(): Boolean {
+    fun ejecutarLogin() {
         val state = _uiState.value
         var esValido = true
         var errUsuario: String? = null
         var errPassword: String? = null
 
         if (state.usuarioOrEmail.trim().length < 3) {
-            errUsuario = "El usuario debe tener al menos 3 caracteres."
+            errUsuario = "Ingresa tu usuario o correo."
             esValido = false
         }
 
         if (state.password.trim().length < 4) {
-            errPassword = "La contraseña debe tener al menos 4 caracteres."
+            errPassword = "Ingresa tu contraseña."
             esValido = false
         }
 
@@ -73,27 +72,40 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
                     errorPassword = errPassword
                 )
             }
-            return false
+            return
         }
 
         _uiState.update { it.copy(isLoading = true) }
 
         viewModelScope.launch {
-            val idBuscado = state.usuarioOrEmail.trim()
-            val usuarioExistente = dao.obtenerUsuario(idBuscado)
+            val busqueda = state.usuarioOrEmail.trim()
+            val passIngresada = state.password.trim()
 
-            // Si el usuario no existe en Room, creamos la entidad con las propiedades correctas
-            if (usuarioExistente == null) {
-                val nuevoUsuario = UsuarioPruebaEntity(
-                    idUsuario = idBuscado,
-                    aliasFicticio = idBuscado,
-                    tokenSesion = "token_demo_local",
-                    recordatorioActivo = true,
-                    horaRecordatorio = "20:00"
-                )
-                dao.insertarUsuario(nuevoUsuario)
+            // Consultar si el usuario existe por ID o Correo
+            val usuarioEncontrado = dao.obtenerUsuarioPorIdOCorreo(busqueda)
+
+            if (usuarioEncontrado == null) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorUsuario = "La cuenta no existe. Por favor regístrate."
+                    )
+                }
+                return@launch
             }
 
+            // Validar coincidencia exacta de contraseña
+            if (usuarioEncontrado.password != passIngresada) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorPassword = "La contraseña es incorrecta."
+                    )
+                }
+                return@launch
+            }
+
+            // Autenticación correcta
             _uiState.update {
                 it.copy(
                     isLoading = false,
@@ -101,8 +113,6 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
         }
-
-        return true
     }
 
     fun resetearEstadoLogin() {

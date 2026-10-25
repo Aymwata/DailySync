@@ -41,9 +41,9 @@ data class ActividadDiaUi(
 )
 
 data class HomeUiState(
-    val fecha: String,
-    val saludo: String,
-    val iniciales: String,
+    val fecha: String = "",
+    val saludo: String = "",
+    val iniciales: String = "US",
     val actividadSemanal: List<ActividadDiaUi> = emptyList(),
     val error: String? = null
 )
@@ -55,35 +55,38 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     )
     private var observacion: Job? = null
 
-    private val _uiState = MutableStateFlow(
-        crearEstadoInicial()
-    )
-
-    val uiState: StateFlow<HomeUiState> =
-        _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(crearEstadoInicial())
+    val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     fun cargar(usuarioId: String) {
         observacion?.cancel()
-        _uiState.value = crearEstadoInicial()
+
+        val estadoBase = crearEstadoInicial(usuarioId)
+        _uiState.value = estadoBase
+
         observacion = viewModelScope.launch {
             try {
-                // La misma fuente del historial: guardar o eliminar actualiza el resumen.
+                // Escucha de forma reactiva los cambios en Room
                 repository.observarHistorial(usuarioId).collect { registros ->
+                    val actividad = construirActividadSemanal(registros.map { it.fechaHora })
                     _uiState.update {
-                        crearEstadoInicial().copy(
-                            actividadSemanal = construirActividadSemanal(registros.map { it.fechaHora })
+                        it.copy(
+                            actividadSemanal = actividad,
+                            error = null
                         )
                     }
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = "No se pudo cargar la actividad semanal.") }
+                _uiState.update {
+                    it.copy(error = "No se pudo cargar la actividad semanal.")
+                }
             }
         }
     }
 
-    private fun crearEstadoInicial(): HomeUiState {
+    private fun crearEstadoInicial(usuarioId: String = ""): HomeUiState {
         val ahora = Calendar.getInstance()
         val hora = ahora.get(Calendar.HOUR_OF_DAY)
 
@@ -98,10 +101,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             Locale("es", "CL")
         )
 
+        val inicialesCalculadas = if (usuarioId.isBlank()) {
+            "US"
+        } else {
+            usuarioId.take(2).uppercase(Locale.ROOT)
+        }
+
         return HomeUiState(
             fecha = formatoFecha.format(ahora.time),
             saludo = saludo,
-            iniciales = "?"
+            iniciales = inicialesCalculadas
         )
     }
 }

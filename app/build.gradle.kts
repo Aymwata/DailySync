@@ -54,6 +54,7 @@ dependencies {
     // Room Database con KSP
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
+    implementation(libs.androidx.room3.common)
     ksp(libs.androidx.room.compiler)
 
     testImplementation(libs.junit)

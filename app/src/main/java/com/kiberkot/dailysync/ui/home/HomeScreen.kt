@@ -18,10 +18,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.kiberkot.dailysync.ui.theme.DailySyncTheme
-import com.kiberkot.dailysync.viewmodel.ModuloHome
-import com.kiberkot.dailysync.viewmodel.SeccionHome
 import com.kiberkot.dailysync.viewmodel.ActividadDiaUi
 import com.kiberkot.dailysync.viewmodel.HomeUiState
+import com.kiberkot.dailysync.viewmodel.ModuloHome
+import com.kiberkot.dailysync.viewmodel.SeccionHome
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -280,10 +280,7 @@ private fun ActividadSemanalCard(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(
-                                            (
-                                                    4f + 60f *
-                                                            dia.cantidad / maximo
-                                                    ).dp
+                                            (4f + 60f * dia.cantidad / maximo).dp
                                         ),
                                     shape = RoundedCornerShape(6.dp),
                                     color = if (dia.esHoy) {

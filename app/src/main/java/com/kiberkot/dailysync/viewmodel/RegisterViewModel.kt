@@ -100,10 +100,30 @@ class RegisterViewModel(application: Application) : AndroidViewModel(application
         _uiState.update { it.copy(isLoading = true) }
 
         viewModelScope.launch {
+            val idBuscado = state.idUsuario.trim()
+            val correoBuscado = state.correo.trim()
+
+            // Verificar si el ID o Correo ya existen en Room
+            val usuarioExistente = dao.obtenerUsuarioPorIdOCorreo(idBuscado)
+                ?: dao.obtenerUsuarioPorIdOCorreo(correoBuscado)
+
+            if (usuarioExistente != null) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorId = if (usuarioExistente.idUsuario == idBuscado) "El ID ya se encuentra registrado." else null,
+                        errorCorreo = if (usuarioExistente.correo == correoBuscado) "El correo ya está registrado." else null
+                    )
+                }
+                return@launch
+            }
+
+            // Inserción de la nueva cuenta en la base de datos local
             val nuevoUsuario = UsuarioPruebaEntity(
-                idUsuario = state.idUsuario.trim(),
+                idUsuario = idBuscado,
                 aliasFicticio = state.aliasFicticio.trim(),
-                correo = state.correo.trim(),
+                correo = correoBuscado,
+                password = state.password.trim(),
                 tokenSesion = "token_${System.currentTimeMillis()}",
                 recordatorioActivo = true,
                 horaRecordatorio = "20:00"
