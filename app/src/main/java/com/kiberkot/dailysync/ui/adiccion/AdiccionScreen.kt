@@ -24,6 +24,7 @@ import com.kiberkot.dailysync.viewmodel.AdiccionUiState
 @Composable
 fun AdiccionScreen(
     state: AdiccionUiState,
+    editando: Boolean = false,
     onCambioImpulso: (Int) -> Unit,
     onCambioDesencadenante: (String) -> Unit,
     onSeleccionarAccion: (Int) -> Unit,
@@ -37,7 +38,7 @@ fun AdiccionScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Adicciones y Craving", fontWeight = FontWeight.Bold) },
+                title = { Text(if (editando) "Editar Craving" else "Adicciones y Craving", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onVolver) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
@@ -140,8 +141,8 @@ fun AdiccionScreen(
                 modifier = Modifier.fillMaxWidth().height(52.dp)
             ) {
                 if (state.isLoading) CircularProgressIndicator(color = Color.White)
-                else Text("Guardar Registro", fontWeight = FontWeight.Bold)
+                else Text(if (editando) "Guardar Cambios" else "Guardar Registro", fontWeight = FontWeight.Bold)
             }
         }
     }
-}
+    }

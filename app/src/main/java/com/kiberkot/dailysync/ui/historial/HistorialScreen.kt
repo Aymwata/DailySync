@@ -280,11 +280,15 @@ private fun TarjetaHistorial(
                 TextButton(
                     onClick = onEditar,
                     enabled = habilitada &&
-                            registro.ambito in setOf(AmbitoRegistro.ANIMO, AmbitoRegistro.DBT)
+                            registro.ambito in setOf(
+                        AmbitoRegistro.ANIMO,
+                        AmbitoRegistro.DBT,
+                        AmbitoRegistro.NEURODESARROLLO,
+                        AmbitoRegistro.ADICCIONES
+                    )
                 ) {
                     Text("Editar")
                 }
-
                 TextButton(
                     onClick = onEliminar,
                     enabled = habilitada

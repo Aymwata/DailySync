@@ -24,6 +24,7 @@ import com.kiberkot.dailysync.viewmodel.NeuroUiState
 @Composable
 fun NeuroScreen(
     state: NeuroUiState,
+    editando: Boolean = false,
     onCambioTipoActividad: (String) -> Unit,
     onCambioSobrecarga: (Int) -> Unit,
     onSeleccionarEstrategia: (Int) -> Unit,
@@ -36,7 +37,7 @@ fun NeuroScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Neurodesarrollo", fontWeight = FontWeight.Bold) },
+                title = { Text(if (editando) "Editar Neurodesarrollo" else "Neurodesarrollo", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onVolver) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
@@ -154,8 +155,8 @@ fun NeuroScreen(
                 modifier = Modifier.fillMaxWidth().height(52.dp)
             ) {
                 if (state.isLoading) CircularProgressIndicator(color = Color.White)
-                else Text("Guardar Registro", fontWeight = FontWeight.Bold)
+                else Text(if (editando) "Guardar Cambios" else "Guardar Registro", fontWeight = FontWeight.Bold)
             }
         }
     }
-}
+    }

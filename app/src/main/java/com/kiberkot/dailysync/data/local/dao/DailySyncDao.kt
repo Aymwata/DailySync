@@ -6,6 +6,19 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface DailySyncDao {
+    // --- CONSULTAS Y ACTUALIZACIÓN NEURODESARROLLO ---
+    @Query("SELECT * FROM REGISTRO_NEURO WHERE id_registro = :id AND id_usuario = :usuarioId LIMIT 1")
+    fun observarRegistroNeuro(id: String, usuarioId: String): Flow<RegistroNeuroEntity?>
+
+    @Update
+    suspend fun actualizarRegistroNeuro(registro: RegistroNeuroEntity)
+
+    // --- CONSULTAS Y ACTUALIZACIÓN ADICCIÓN / CRAVING ---
+    @Query("SELECT * FROM REGISTRO_ADICCION WHERE id_registro = :id AND id_usuario = :usuarioId LIMIT 1")
+    fun observarRegistroAdiccion(id: String, usuarioId: String): Flow<RegistroAdiccionEntity?>
+
+    @Update
+    suspend fun actualizarRegistroAdiccion(registro: RegistroAdiccionEntity)
     @Query("SELECT * FROM USUARIO_PRUEBA WHERE id_usuario = :busqueda OR correo = :busqueda LIMIT 1")
     suspend fun obtenerUsuarioPorIdOCorreo(busqueda: String): UsuarioPruebaEntity?
     // --- USUARIO Y SESIÓN ---

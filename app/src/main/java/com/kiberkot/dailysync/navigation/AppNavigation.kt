@@ -16,6 +16,7 @@ import androidx.navigation.navArgument
 import com.kiberkot.dailysync.data.repository.DbtRepository
 import com.kiberkot.dailysync.model.AmbitoRegistro
 import com.kiberkot.dailysync.ui.adiccion.AdiccionScreen
+import com.kiberkot.dailysync.ui.adiccion.DetalleAdiccionScreen
 import com.kiberkot.dailysync.ui.dbt.CatalogoDbtScreen
 import com.kiberkot.dailysync.ui.dbt.DetalleHabilidadDbtScreen
 import com.kiberkot.dailysync.ui.dbt.RegistroDbtScreen
@@ -23,6 +24,7 @@ import com.kiberkot.dailysync.ui.historial.HistorialScreen
 import com.kiberkot.dailysync.ui.home.HomeScreen
 import com.kiberkot.dailysync.ui.login.LoginScreen
 import com.kiberkot.dailysync.ui.login.RegisterScreen
+import com.kiberkot.dailysync.ui.neuro.DetalleNeuroScreen
 import com.kiberkot.dailysync.ui.neuro.NeuroScreen
 import com.kiberkot.dailysync.ui.registro.RegistroAnimoScreen
 import com.kiberkot.dailysync.viewmodel.*
@@ -33,8 +35,18 @@ object Destinos {
     const val HOME = "home"
     const val REGISTRO = "registro"
     const val HISTORIAL = "historial"
+
     const val NEURO = "neuro"
+    const val NEURO_EDITAR = "neuro/editar/{registroId}"
+    const val NEURO_DETALLE = "neuro/detalle/{registroId}"
+    fun crearRutaEditarNeuro(id: String) = "neuro/editar/$id"
+    fun crearRutaDetalleNeuro(id: String) = "neuro/detalle/$id"
+
     const val ADICCION = "adiccion"
+    const val ADICCION_EDITAR = "adiccion/editar/{registroId}"
+    const val ADICCION_DETALLE = "adiccion/detalle/{registroId}"
+    fun crearRutaEditarAdiccion(id: String) = "adiccion/editar/$id"
+    fun crearRutaDetalleAdiccion(id: String) = "adiccion/detalle/$id"
 
     const val DETALLE = "detalle/{registroId}"
     const val EDITAR = "editar/{registroId}"
@@ -172,27 +184,85 @@ fun AppNavigation(
             )
         }
 
-        composable(route = Destinos.NEURO) {
-            NeuroScreen(
+        // --- NEURODESARROLLO (CREAR / EDITAR / DETALLE) ---
+        listOf(Destinos.NEURO, Destinos.NEURO_EDITAR).forEach { ruta ->
+            val editando = ruta == Destinos.NEURO_EDITAR
+            composable(
+                route = ruta,
+                arguments = if (editando) listOf(navArgument("registroId") { type = NavType.StringType }) else emptyList()
+            ) { entrada ->
+                val id = entrada.arguments?.getString("registroId")
+                LaunchedEffect(usuarioDbtId, id) {
+                    neuroViewModel.cargar(usuarioDbtId, id)
+                }
+
+                NeuroScreen(
+                    state = neuroUiState,
+                    editando = editando,
+                    onCambioTipoActividad = neuroViewModel::cambiarTipoActividad,
+                    onCambioSobrecarga = neuroViewModel::cambiarNivelSobrecarga,
+                    onSeleccionarEstrategia = neuroViewModel::seleccionarEstrategia,
+                    onCambioContexto = neuroViewModel::cambiarContexto,
+                    onCambioResultado = neuroViewModel::cambiarResultadoPercibido,
+                    onGuardar = { neuroViewModel.guardarRegistro(usuarioDbtId) },
+                    onVolver = { navController.popBackStack() }
+                )
+            }
+        }
+
+        composable(
+            route = Destinos.NEURO_DETALLE,
+            arguments = listOf(navArgument("registroId") { type = NavType.StringType })
+        ) { entrada ->
+            val id = entrada.arguments?.getString("registroId") ?: ""
+            LaunchedEffect(usuarioDbtId, id) {
+                neuroViewModel.cargar(usuarioDbtId, id)
+            }
+
+            DetalleNeuroScreen(
                 state = neuroUiState,
-                onCambioTipoActividad = neuroViewModel::cambiarTipoActividad,
-                onCambioSobrecarga = neuroViewModel::cambiarNivelSobrecarga,
-                onSeleccionarEstrategia = neuroViewModel::seleccionarEstrategia,
-                onCambioContexto = neuroViewModel::cambiarContexto,
-                onCambioResultado = neuroViewModel::cambiarResultadoPercibido,
-                onGuardar = { neuroViewModel.guardarRegistro(usuarioDbtId) },
+                onEditar = { navController.navigate(Destinos.crearRutaEditarNeuro(id)) },
                 onVolver = { navController.popBackStack() }
             )
         }
 
-        composable(route = Destinos.ADICCION) {
-            AdiccionScreen(
+        // --- ADICCIONES / CRAVING (CREAR / EDITAR / DETALLE) ---
+        listOf(Destinos.ADICCION, Destinos.ADICCION_EDITAR).forEach { ruta ->
+            val editando = ruta == Destinos.ADICCION_EDITAR
+            composable(
+                route = ruta,
+                arguments = if (editando) listOf(navArgument("registroId") { type = NavType.StringType }) else emptyList()
+            ) { entrada ->
+                val id = entrada.arguments?.getString("registroId")
+                LaunchedEffect(usuarioDbtId, id) {
+                    adiccionViewModel.cargar(usuarioDbtId, id)
+                }
+
+                AdiccionScreen(
+                    state = adiccionUiState,
+                    editando = editando,
+                    onCambioImpulso = adiccionViewModel::cambiarNivelImpulso,
+                    onCambioDesencadenante = adiccionViewModel::cambiarDesencadenante,
+                    onSeleccionarAccion = adiccionViewModel::seleccionarAccion,
+                    onCambioEstadoObjetivo = adiccionViewModel::cambiarEstadoObjetivo,
+                    onGuardar = { adiccionViewModel.guardarRegistro(usuarioDbtId) },
+                    onVolver = { navController.popBackStack() }
+                )
+            }
+        }
+
+        composable(
+            route = Destinos.ADICCION_DETALLE,
+            arguments = listOf(navArgument("registroId") { type = NavType.StringType })
+        ) { entrada ->
+            val id = entrada.arguments?.getString("registroId") ?: ""
+            LaunchedEffect(usuarioDbtId, id) {
+                adiccionViewModel.cargar(usuarioDbtId, id)
+            }
+
+            DetalleAdiccionScreen(
                 state = adiccionUiState,
-                onCambioImpulso = adiccionViewModel::cambiarNivelImpulso,
-                onCambioDesencadenante = adiccionViewModel::cambiarDesencadenante,
-                onSeleccionarAccion = adiccionViewModel::seleccionarAccion,
-                onCambioEstadoObjetivo = adiccionViewModel::cambiarEstadoObjetivo,
-                onGuardar = { adiccionViewModel.guardarRegistro(usuarioDbtId) },
+                onEditar = { navController.navigate(Destinos.crearRutaEditarAdiccion(id)) },
                 onVolver = { navController.popBackStack() }
             )
         }
@@ -212,17 +282,16 @@ fun AppNavigation(
                     when (registro.ambito) {
                         AmbitoRegistro.ANIMO -> navController.navigate(Destinos.crearRutaDetalle(registro.id))
                         AmbitoRegistro.DBT -> navController.navigate(Destinos.crearRutaDetalleDbt(registro.id))
-                        else -> {
-                            Toast.makeText(context, "Detalle del registro: ${registro.titulo}", Toast.LENGTH_SHORT).show()
-                        }
+                        AmbitoRegistro.NEURODESARROLLO -> navController.navigate(Destinos.crearRutaDetalleNeuro(registro.id))
+                        AmbitoRegistro.ADICCIONES -> navController.navigate(Destinos.crearRutaDetalleAdiccion(registro.id))
                     }
                 },
                 onEditar = { registro ->
                     when (registro.ambito) {
                         AmbitoRegistro.ANIMO -> navController.navigate(Destinos.crearRutaEditar(registro.id))
                         AmbitoRegistro.DBT -> navController.navigate(Destinos.crearRutaEditarDbt(registro.id))
-                        AmbitoRegistro.NEURODESARROLLO -> navController.navigate(Destinos.NEURO)
-                        AmbitoRegistro.ADICCIONES -> navController.navigate(Destinos.ADICCION)
+                        AmbitoRegistro.NEURODESARROLLO -> navController.navigate(Destinos.crearRutaEditarNeuro(registro.id))
+                        AmbitoRegistro.ADICCIONES -> navController.navigate(Destinos.crearRutaEditarAdiccion(registro.id))
                     }
                 },
                 onSolicitarEliminar = historialViewModel::solicitarEliminacion,
