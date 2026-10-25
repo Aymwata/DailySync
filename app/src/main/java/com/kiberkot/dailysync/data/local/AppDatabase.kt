@@ -157,22 +157,34 @@ abstract class AppDatabase : RoomDatabase() {
         private class PrepopulateCallback : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
+                poblarDatosIniciales()
+            }
+
+            override fun onOpen(db: SupportSQLiteDatabase) {
+                super.onOpen(db)
+                poblarDatosIniciales()
+            }
+
+            private fun poblarDatosIniciales() {
                 INSTANCE?.let { database ->
                     CoroutineScope(Dispatchers.IO).launch {
                         val dao = database.dailySyncDao()
 
                         // Usuario Ficticio de Prueba Inicial (Contraseña: 1234)
-                        dao.insertarUsuario(
-                            UsuarioPruebaEntity(
-                                idUsuario = "usr_demo_01",
-                                aliasFicticio = "UsuarioPrueba",
-                                correo = "demo@dailysync.app",
-                                password = "1234",
-                                tokenSesion = "token_ficticio_123",
-                                recordatorioActivo = true,
-                                horaRecordatorio = "20:00"
+                        val demoUser = dao.obtenerUsuario("usr_demo_01")
+                        if (demoUser == null || demoUser.correo.isBlank() || demoUser.password.isBlank()) {
+                            dao.insertarUsuario(
+                                UsuarioPruebaEntity(
+                                    idUsuario = "usr_demo_01",
+                                    aliasFicticio = "UsuarioPrueba",
+                                    correo = "demo@dailysync.app",
+                                    password = "1234",
+                                    tokenSesion = "token_ficticio_123",
+                                    recordatorioActivo = true,
+                                    horaRecordatorio = "20:00"
+                                )
                             )
-                        )
+                        }
 
                         dao.insertarCatalogoAnimo(catalogoAnimoInicial)
                         dao.asegurarCatalogoDbt(catalogoDbtInicial)

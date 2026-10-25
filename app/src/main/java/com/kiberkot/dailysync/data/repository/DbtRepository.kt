@@ -31,7 +31,17 @@ class DbtRepository(
     suspend fun prepararUsuario(usuarioId: String) {
         // Solo se crea el usuario académico conocido; no se inventan cuentas de sesión.
         if (usuarioId == USUARIO_DEMO) {
-            dao.asegurarUsuarioDbt(UsuarioPruebaEntity(usuarioId, "UsuarioPrueba"))
+            dao.asegurarUsuarioDbt(
+                UsuarioPruebaEntity(
+                    idUsuario = usuarioId,
+                    aliasFicticio = "UsuarioPrueba",
+                    correo = "demo@dailysync.app",
+                    password = "1234",
+                    tokenSesion = "token_ficticio_123",
+                    recordatorioActivo = true,
+                    horaRecordatorio = "20:00"
+                )
+            )
         }
         check(dao.obtenerUsuario(usuarioId) != null) { "El usuario no está disponible. Vuelve a iniciar sesión." }
     }

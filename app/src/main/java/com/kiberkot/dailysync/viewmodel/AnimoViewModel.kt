@@ -57,11 +57,13 @@ class AnimoViewModel(application: Application) : AndroidViewModel(application) {
     init {
         viewModelScope.launch {
             val usuarioExistente = dao.obtenerUsuario("usr_demo_01")
-            if (usuarioExistente == null) {
+            if (usuarioExistente == null || usuarioExistente.correo.isBlank() || usuarioExistente.password.isBlank()) {
                 dao.insertarUsuario(
                     UsuarioPruebaEntity(
                         idUsuario = "usr_demo_01",
                         aliasFicticio = "UsuarioPrueba",
+                        correo = "demo@dailysync.app",
+                        password = "1234",
                         tokenSesion = "token_ficticio_123",
                         recordatorioActivo = true,
                         horaRecordatorio = "20:00"
