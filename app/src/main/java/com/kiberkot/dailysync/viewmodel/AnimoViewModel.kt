@@ -10,19 +10,19 @@ import com.kiberkot.dailysync.data.local.entities.UsuarioPruebaEntity
 import com.kiberkot.dailysync.model.CategoriaAnimo
 import com.kiberkot.dailysync.model.RegistroAnimo
 import com.kiberkot.dailysync.utils.NotificationHelper
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
 
-// Catálogo sintético base (Lemac DataLab) como respaldo inicial
 private val CATALOGO_ANIMO_DEFAULT = listOf(
     CategoriaAnimo(1, "Tranquilo / Calmo"),
     CategoriaAnimo(2, "Motivado / Con energía"),
@@ -40,7 +40,10 @@ data class AnimoUiState(
     val notaOpcional: String = "",
     val errorCategoria: String? = null,
     val errorContexto: String? = null,
-    val bannerExitoVisible: Boolean = false
+    val bannerExitoVisible: Boolean = false,
+    val idRegistroExistente: String? = null,
+    val editando: Boolean = false,
+    val fechaHoraOriginal: String = ""
 )
 
 class AnimoViewModel(application: Application) : AndroidViewModel(application) {
@@ -52,7 +55,6 @@ class AnimoViewModel(application: Application) : AndroidViewModel(application) {
     val uiState: StateFlow<AnimoUiState> = _uiState.asStateFlow()
 
     init {
-        // 1. Asegurar datos base en Room para respetar ForeignKeys (Offline-First)
         viewModelScope.launch {
             val usuarioExistente = dao.obtenerUsuario("usr_demo_01")
             if (usuarioExistente == null) {
@@ -73,7 +75,6 @@ class AnimoViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        // 2. Combinar reactivamente Catálogo y Registros desde Room (evita condición de carrera)
         viewModelScope.launch {
             combine(
                 dao.obtenerCatalogoAnimo(),
@@ -111,6 +112,52 @@ class AnimoViewModel(application: Application) : AndroidViewModel(application) {
                         categorias = categorias,
                         historial = registros
                     )
+                }
+            }
+        }
+    }
+
+    fun cargarParaEditar(registroId: String) {
+        viewModelScope.launch {
+            val registroLocal = _uiState.value.historial.find { it.id == registroId }
+            if (registroLocal != null) {
+                val cat = _uiState.value.categorias.find { it.id == registroLocal.categoriaId }
+                    ?: CategoriaAnimo(registroLocal.categoriaId, registroLocal.categoriaNombre)
+
+                _uiState.update {
+                    it.copy(
+                        idRegistroExistente = registroLocal.id,
+                        editando = true,
+                        categoriaSeleccionada = cat,
+                        nivelIntensidad = registroLocal.nivelIntensidad.toFloat(),
+                        contexto = registroLocal.contexto,
+                        notaOpcional = registroLocal.notaOpcional ?: "",
+                        fechaHoraOriginal = registroLocal.fechaHora,
+                        errorCategoria = null,
+                        errorContexto = null
+                    )
+                }
+            } else {
+                val entities = dao.obtenerRegistrosAnimo().firstOrNull() ?: emptyList()
+                val entity = entities.find { it.idRegistro == registroId }
+                if (entity != null) {
+                    val catEntities = dao.obtenerCatalogoAnimo().firstOrNull() ?: emptyList()
+                    val catName = catEntities.find { it.idCategoria == entity.idCategoria }?.nombreCategoria ?: "Ánimo"
+                    val cat = CategoriaAnimo(entity.idCategoria, catName)
+
+                    _uiState.update {
+                        it.copy(
+                            idRegistroExistente = entity.idRegistro,
+                            editando = true,
+                            categoriaSeleccionada = cat,
+                            nivelIntensidad = entity.nivelIntensidad.toFloat(),
+                            contexto = entity.contexto,
+                            notaOpcional = entity.notaOpcional ?: "",
+                            fechaHoraOriginal = entity.fechaHora,
+                            errorCategoria = null,
+                            errorContexto = null
+                        )
+                    }
                 }
             }
         }
@@ -185,11 +232,13 @@ class AnimoViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         val categoriaElegida = currentState.categoriaSeleccionada!!
-        val timestampActual = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
-        val nuevoId = UUID.randomUUID().toString()
+        val timestampActual = currentState.fechaHoraOriginal.ifEmpty {
+            SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
+        }
+        val idFinal = currentState.idRegistroExistente ?: UUID.randomUUID().toString()
 
-        val nuevaEntidad = RegistroAnimoEntity(
-            idRegistro = nuevoId,
+        val entidad = RegistroAnimoEntity(
+            idRegistro = idFinal,
             idUsuario = "usr_demo_01",
             idCategoria = categoriaElegida.id,
             fechaHora = timestampActual,
@@ -200,22 +249,20 @@ class AnimoViewModel(application: Application) : AndroidViewModel(application) {
         )
 
         viewModelScope.launch {
-            // 1. Guardar en Room DB
-            dao.insertarRegistroAnimo(nuevaEntidad)
+            if (currentState.editando) {
+                dao.actualizarRegistroAnimo(entidad)
+            } else {
+                dao.insertarRegistroAnimo(entidad)
+            }
 
-            // 2. Emitir Notificación Nativa discreta (RF06)
             notificationHelper.mostrarNotificacionCheckIn(
                 titulo = "DailySync",
-                mensaje = "Nuevo check-in guardado localmente."
+                mensaje = if (currentState.editando) "Check-in actualizado." else "Nuevo check-in guardado localmente."
             )
 
-            // 3. Encender el banner animado
             _uiState.update { it.copy(bannerExitoVisible = true) }
+            delay(1000L)
 
-            // 4. Delay de 1.5 segundos para apreciar el feedback visual
-            delay(1500L)
-
-            // 5. Limpiar formulario
             _uiState.update {
                 it.copy(
                     categoriaSeleccionada = null,
@@ -224,11 +271,13 @@ class AnimoViewModel(application: Application) : AndroidViewModel(application) {
                     notaOpcional = "",
                     errorCategoria = null,
                     errorContexto = null,
-                    bannerExitoVisible = false
+                    bannerExitoVisible = false,
+                    idRegistroExistente = null,
+                    editando = false,
+                    fechaHoraOriginal = ""
                 )
             }
 
-            // 6. Redirigir al Historial
             onExito()
         }
 
@@ -236,7 +285,7 @@ class AnimoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun buscarPorId(id: String): RegistroAnimo? {
-        return _uiState.value.historial.firstOrNull { it.id == id }
+        return _uiState.value.historial.find { it.id == id }
     }
 
     fun eliminarRegistro(id: String, onEliminado: () -> Unit) {
@@ -244,38 +293,5 @@ class AnimoViewModel(application: Application) : AndroidViewModel(application) {
             dao.eliminarRegistroAnimoPorId(id)
             onEliminado()
         }
-    }
-
-    // Actualizar un registro existente en Room DB
-    fun actualizarRegistro(
-        idRegistro: String,
-        fechaHoraOriginal: String,
-        categoria: CategoriaAnimo,
-        intensidad: Int,
-        contexto: String,
-        nota: String?,
-        onExito: () -> Unit
-    ): Boolean {
-        val contextoLimpio = contexto.trim()
-        if (contextoLimpio.isBlank() || contextoLimpio.length < 3 || contextoLimpio.length > 60) {
-            return false
-        }
-
-        val entidadActualizada = RegistroAnimoEntity(
-            idRegistro = idRegistro,
-            idUsuario = "usr_demo_01",
-            idCategoria = categoria.id,
-            fechaHora = fechaHoraOriginal,
-            nivelIntensidad = intensidad,
-            contexto = contextoLimpio,
-            notaOpcional = nota?.trim()?.ifBlank { null },
-            pendienteSync = true
-        )
-
-        viewModelScope.launch {
-            dao.actualizarRegistroAnimo(entidadActualizada)
-            onExito()
-        }
-        return true
     }
 }

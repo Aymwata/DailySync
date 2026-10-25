@@ -26,6 +26,7 @@ import com.kiberkot.dailysync.viewmodel.AnimoUiState
 @Composable
 fun RegistroAnimoScreen(
     state: AnimoUiState,
+    editando: Boolean = false,
     onSeleccionarCategoria: (CategoriaAnimo) -> Unit,
     onCambioIntensidad: (Float) -> Unit,
     onCambioContexto: (String) -> Unit,
@@ -42,7 +43,7 @@ fun RegistroAnimoScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Nuevo Check-in",
+                        text = if (editando) "Editar Check-in" else "Nuevo Check-in",
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
                     )
                 },
@@ -150,7 +151,6 @@ fun RegistroAnimoScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // Banner de Éxito animado abajo
             AnimatedVisibility(
                 visible = state.bannerExitoVisible,
                 enter = fadeIn(),
@@ -173,7 +173,7 @@ fun RegistroAnimoScreen(
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "¡Check-in guardado en Room DB!",
+                            text = if (editando) "¡Cambios guardados en Room DB!" else "¡Check-in guardado en Room DB!",
                             color = Color(0xFF2E7D32),
                             fontWeight = FontWeight.Bold
                         )
@@ -181,7 +181,6 @@ fun RegistroAnimoScreen(
                 }
             }
 
-            // Botón principal
             Button(
                 onClick = onGuardar,
                 enabled = !state.bannerExitoVisible,
@@ -191,7 +190,7 @@ fun RegistroAnimoScreen(
                     .height(56.dp)
             ) {
                 Text(
-                    text = if (state.bannerExitoVisible) "Guardando..." else "Guardar Registro",
+                    text = if (state.bannerExitoVisible) "Guardando..." else if (editando) "Guardar Cambios" else "Guardar Registro",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )

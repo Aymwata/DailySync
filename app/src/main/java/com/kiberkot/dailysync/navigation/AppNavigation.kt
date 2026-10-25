@@ -19,6 +19,7 @@ import com.kiberkot.dailysync.ui.adiccion.AdiccionScreen
 import com.kiberkot.dailysync.ui.adiccion.DetalleAdiccionScreen
 import com.kiberkot.dailysync.ui.dbt.CatalogoDbtScreen
 import com.kiberkot.dailysync.ui.dbt.DetalleHabilidadDbtScreen
+import com.kiberkot.dailysync.ui.dbt.DetalleRegistroDbtScreen
 import com.kiberkot.dailysync.ui.dbt.RegistroDbtScreen
 import com.kiberkot.dailysync.ui.historial.HistorialScreen
 import com.kiberkot.dailysync.ui.home.HomeScreen
@@ -26,6 +27,7 @@ import com.kiberkot.dailysync.ui.login.LoginScreen
 import com.kiberkot.dailysync.ui.login.RegisterScreen
 import com.kiberkot.dailysync.ui.neuro.DetalleNeuroScreen
 import com.kiberkot.dailysync.ui.neuro.NeuroScreen
+import com.kiberkot.dailysync.ui.registro.DetalleAnimoScreen
 import com.kiberkot.dailysync.ui.registro.RegistroAnimoScreen
 import com.kiberkot.dailysync.viewmodel.*
 
@@ -174,11 +176,49 @@ fun AppNavigation(
         composable(route = Destinos.REGISTRO) {
             RegistroAnimoScreen(
                 state = animoUiState,
+                editando = false,
                 onSeleccionarCategoria = animoViewModel::seleccionarCategoria,
                 onCambioIntensidad = animoViewModel::cambiarIntensidad,
                 onCambioContexto = animoViewModel::cambiarContexto,
                 onCambioNota = animoViewModel::cambiarNota,
                 onGuardar = { animoViewModel.guardarRegistro(onExito = { navController.popBackStack() }) },
+                onOcultarBanner = animoViewModel::ocultarBanner,
+                onVolver = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Destinos.DETALLE,
+            arguments = listOf(navArgument("registroId") { type = NavType.StringType })
+        ) { entrada ->
+            val id = entrada.arguments?.getString("registroId") ?: ""
+            DetalleAnimoScreen(
+                state = animoUiState,
+                registroId = id,
+                onEditar = { navController.navigate(Destinos.crearRutaEditar(id)) },
+                onVolver = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Destinos.EDITAR,
+            arguments = listOf(navArgument("registroId") { type = NavType.StringType })
+        ) { entrada ->
+            val id = entrada.arguments?.getString("registroId") ?: ""
+            LaunchedEffect(id) {
+                animoViewModel.cargarParaEditar(id)
+            }
+
+            RegistroAnimoScreen(
+                state = animoUiState,
+                editando = true,
+                onSeleccionarCategoria = animoViewModel::seleccionarCategoria,
+                onCambioIntensidad = animoViewModel::cambiarIntensidad,
+                onCambioContexto = animoViewModel::cambiarContexto,
+                onCambioNota = animoViewModel::cambiarNota,
+                onGuardar = {
+                    animoViewModel.guardarRegistro(onExito = { navController.popBackStack() })
+                },
                 onOcultarBanner = animoViewModel::ocultarBanner,
                 onVolver = { navController.popBackStack() }
             )
@@ -324,6 +364,28 @@ fun AppNavigation(
                 onRegistrarPractica = { navController.navigate(Destinos.crearRutaNuevaPracticaDbt(it)) },
                 onReintentar = dbtViewModel::cargarCatalogo,
                 onVolver = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Destinos.DBT_DETALLE,
+            arguments = listOf(navArgument("registroId") { type = NavType.StringType })
+        ) { entrada ->
+            val vm: RegistroDbtViewModel = viewModel()
+            val state by vm.uiState.collectAsState()
+            val id = entrada.arguments?.getString("registroId") ?: ""
+
+            LaunchedEffect(usuarioDbtId, id) {
+                vm.cargar(usuarioDbtId, id, null)
+            }
+
+            DetalleRegistroDbtScreen(
+                state = state,
+                onEditar = { navController.navigate(Destinos.crearRutaEditarDbt(id)) },
+                onVolver = { navController.popBackStack() },
+                onEliminar = { navController.popBackStack() },
+                onVerHistorial = { navController.navigate(Destinos.HISTORIAL) },
+                onReintentar = { vm.cargar(usuarioDbtId, id, null) }
             )
         }
 
