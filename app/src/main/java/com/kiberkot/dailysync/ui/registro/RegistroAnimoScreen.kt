@@ -1,20 +1,17 @@
 package com.kiberkot.dailysync.ui.registro
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import com.kiberkot.dailysync.ui.components.AvisoRegistroGuardado
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -39,6 +36,7 @@ fun RegistroAnimoScreen(
     val emojis = listOf("🧘", "🚀", "⚡", "🌧️", "💔")
 
     Scaffold(
+        modifier = Modifier.imePadding(),
         topBar = {
             TopAppBar(
                 title = {
@@ -151,35 +149,9 @@ fun RegistroAnimoScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            AnimatedVisibility(
-                visible = state.bannerExitoVisible,
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color(0xFFE8F5E9),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = null,
-                            tint = Color(0xFF2E7D32)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = if (editando) "¡Cambios guardados en Room DB!" else "¡Check-in guardado en Room DB!",
-                            color = Color(0xFF2E7D32),
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
+            AvisoRegistroGuardado(
+                visible = state.bannerExitoVisible, editando = editando
+            )
 
             Button(
                 onClick = onGuardar,

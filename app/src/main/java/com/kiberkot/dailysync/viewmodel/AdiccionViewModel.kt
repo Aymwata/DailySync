@@ -1,5 +1,7 @@
 package com.kiberkot.dailysync.viewmodel
 
+import com.kiberkot.dailysync.utils.NotificationHelper
+
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -27,6 +29,7 @@ data class AdiccionUiState(
 )
 
 class AdiccionViewModel(application: Application) : AndroidViewModel(application) {
+    private val notificationHelper = NotificationHelper(application)
     private val dao = AppDatabase.getDatabase(application).dailySyncDao()
 
     private val _uiState = MutableStateFlow(AdiccionUiState())
@@ -100,6 +103,7 @@ class AdiccionViewModel(application: Application) : AndroidViewModel(application
 
     fun guardarRegistro(idUsuario: String) {
         val state = _uiState.value
+        if (state.isLoading || state.guardadoExitoso) return
 
         if (state.desencadenante.trim().isEmpty()) {
             _uiState.update { it.copy(errorMsg = "Describe el factor desencadenante.") }
@@ -130,6 +134,9 @@ class AdiccionViewModel(application: Application) : AndroidViewModel(application
 
             // insertarRegistroAdiccion usa OnConflictStrategy.REPLACE, por lo que sirve tanto para crear como para editar
             dao.insertarRegistroAdiccion(registro)
+            notificationHelper.mostrarNotificacionCheckIn(
+                "DailySync", if (state.editando) "Registro actualizado." else "Nuevo registro de adicciones guardado localmente."
+            )
             _uiState.update { it.copy(isLoading = false, guardadoExitoso = true) }
         }
     }

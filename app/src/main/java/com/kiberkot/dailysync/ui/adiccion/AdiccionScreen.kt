@@ -1,5 +1,7 @@
 package com.kiberkot.dailysync.ui.adiccion
 
+import com.kiberkot.dailysync.ui.components.AvisoRegistroGuardado
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -36,6 +38,7 @@ fun AdiccionScreen(
     val opcionesObjetivo = listOf("Logrado", "En proceso", "Resistido")
 
     Scaffold(
+        modifier = Modifier.imePadding(),
         topBar = {
             TopAppBar(
                 title = { Text(if (editando) "Editar Craving" else "Adicciones y Craving", fontWeight = FontWeight.Bold) },
@@ -134,9 +137,13 @@ fun AdiccionScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            AvisoRegistroGuardado(
+                visible = state.guardadoExitoso, editando = editando
+            )
+
             Button(
                 onClick = onGuardar,
-                enabled = !state.isLoading,
+                enabled = !state.isLoading && !state.guardadoExitoso,
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth().height(52.dp)
             ) {

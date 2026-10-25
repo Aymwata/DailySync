@@ -1,5 +1,10 @@
 package com.kiberkot.dailysync.ui.components
 
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.ui.semantics.LiveRegionMode
+
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -10,6 +15,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -265,7 +272,7 @@ fun CampoTextoFormulario(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun DbtScaffold(titulo: String, onVolver: () -> Unit, ocupado: Boolean = false, contenido: LazyListScope.() -> Unit) {
-    Scaffold(topBar = {
+    Scaffold(modifier = Modifier.imePadding(), topBar = {
         TopAppBar(title = {
             Column {
                 Text("Habilidades DBT", style = MaterialTheme.typography.labelMedium)
@@ -298,5 +305,27 @@ internal fun DbtError(error: String, onReintentar: () -> Unit, habilitado: Boole
     Column {
         Text(error, color = MaterialTheme.colorScheme.error)
         TextButton(onClick = onReintentar, enabled = habilitado) { Text("Reintentar") }
+    }
+}
+
+/** Confirmación visible solo cuando la escritura en la base ya terminó. */
+@Composable
+fun AvisoRegistroGuardado(visible: Boolean, editando: Boolean = false) {
+    val teclado = LocalSoftwareKeyboardController.current
+    LaunchedEffect(visible) {
+        if (visible) teclado?.hide()
+    }
+    AnimatedVisibility(visible = visible) {
+        Surface(shape = RoundedCornerShape(16.dp), color = Color(0xFFE8F5E9),
+            modifier = Modifier.fillMaxWidth()) {
+            Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center) {
+                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF2E7D32))
+                Spacer(Modifier.width(10.dp))
+                Text(if (editando) "¡Cambios guardados!" else "¡Nuevo registro guardado!",
+                    color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+            }
+        }
     }
 }

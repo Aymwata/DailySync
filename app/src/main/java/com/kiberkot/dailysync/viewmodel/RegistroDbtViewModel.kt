@@ -1,5 +1,8 @@
 package com.kiberkot.dailysync.viewmodel
 
+import com.kiberkot.dailysync.utils.NotificationHelper
+import kotlinx.coroutines.delay
+
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -20,10 +23,12 @@ data class RegistroDbtUiState(
     val cargando: Boolean = true,
     val procesando: Boolean = false,
     val error: String? = null,
+    val bannerExitoVisible: Boolean = false,
     val errores: Map<String, String> = emptyMap()
 )
 
 class RegistroDbtViewModel(application: Application) : AndroidViewModel(application) {
+    private val notificationHelper = NotificationHelper(application)
     private val repository = DbtRepository(AppDatabase.getDatabase(application).dailySyncDao())
     private val _uiState = MutableStateFlow(RegistroDbtUiState())
     val uiState = _uiState.asStateFlow()
@@ -86,7 +91,16 @@ class RegistroDbtViewModel(application: Application) : AndroidViewModel(applicat
         val errores = actual.formulario.errores(actual.catalogo.map { it.id }.toSet())
         _uiState.update { it.copy(errores = errores, error = null) }
         if (errores.isNotEmpty()) return
-        ejecutar { onExito(repository.guardar(clave.first, clave.second, actual.formulario)) }
+        ejecutar {
+            val id = repository.guardar(clave.first, clave.second, actual.formulario)
+            notificationHelper.mostrarNotificacionCheckIn(
+                "DailySync", if (clave.second != null) "Práctica DBT actualizada." else "Nueva práctica DBT guardada localmente."
+            )
+            _uiState.update { it.copy(bannerExitoVisible = true) }
+            delay(1000L)
+            _uiState.update { it.copy(bannerExitoVisible = false) }
+            onExito(id)
+        }
     }
 
     fun eliminar(onExito: () -> Unit) {

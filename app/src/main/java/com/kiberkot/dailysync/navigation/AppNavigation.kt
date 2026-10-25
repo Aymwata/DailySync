@@ -1,5 +1,7 @@
 package com.kiberkot.dailysync.navigation
 
+import kotlinx.coroutines.delay
+
 import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -105,14 +107,18 @@ fun AppNavigation(
 
     LaunchedEffect(neuroUiState.guardadoExitoso) {
         if (neuroUiState.guardadoExitoso) {
-            navController.popBackStack()
+            val entrada = navController.currentBackStackEntry
+            delay(1000L)
+            if (navController.currentBackStackEntry == entrada) navController.popBackStack()
             neuroViewModel.resetearEstado()
         }
     }
 
     LaunchedEffect(adiccionUiState.guardadoExitoso) {
         if (adiccionUiState.guardadoExitoso) {
-            navController.popBackStack()
+            val entrada = navController.currentBackStackEntry
+            delay(1000L)
+            if (navController.currentBackStackEntry == entrada) navController.popBackStack()
             adiccionViewModel.resetearEstado()
         }
     }
@@ -415,7 +421,8 @@ fun AppNavigation(
                     onGuardar = {
                         vm.guardar {
                             if (navController.currentBackStackEntry == entrada) {
-                                navController.popBackStack()
+                                if (editando) navController.popBackStack()
+                                else navController.popBackStack(Destinos.HOME, inclusive = false)
                             }
                         }
                     },

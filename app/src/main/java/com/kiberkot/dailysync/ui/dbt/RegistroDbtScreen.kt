@@ -1,5 +1,7 @@
 package com.kiberkot.dailysync.ui.dbt
 
+import com.kiberkot.dailysync.ui.components.AvisoRegistroGuardado
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -66,6 +68,11 @@ fun RegistroDbtScreen(
                         Text("1 = poco útil · 5 = muy útil", style = MaterialTheme.typography.bodySmall)
                         state.errores["utilidad"]?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     }
+                }
+                item {
+                    AvisoRegistroGuardado(
+                        visible = state.bannerExitoVisible, editando = editando
+                    )
                 }
                 item {
                     Button(onClick = onGuardar, enabled = !state.procesando,
