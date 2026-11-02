@@ -4,7 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.kiberkot.dailysync.data.local.AppDatabase
-import com.kiberkot.dailysync.data.repository.DbtRepository
+import com.kiberkot.dailysync.data.local.dao.DailySyncDao
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,13 +32,10 @@ data class DbtUiState(
         }
 }
 
-class DbtViewModel(
-    application: Application
+class DbtViewModel @JvmOverloads constructor(
+    application: Application,
+    private val dao: DailySyncDao = AppDatabase.getDatabase(application).dailySyncDao()
 ) : AndroidViewModel(application) {
-
-    private val repository = DbtRepository(
-        AppDatabase.getDatabase(application).dailySyncDao()
-    )
 
     private val _uiState = MutableStateFlow(DbtUiState())
     val uiState = _uiState.asStateFlow()
@@ -61,9 +58,12 @@ class DbtViewModel(
 
         observacionCatalogo = viewModelScope.launch {
             try {
-                repository.prepararCatalogo()
-                repository.observarCatalogo()
-                    .collect { habilidades ->
+                dao.obtenerCatalogoDbt()
+                    .collect { entidades ->
+                        val habilidades = entidades.map {
+                            HabilidadDbt(it.idHabilidad, it.nombreHabilidad,
+                                it.moduloDbt, it.contenidoPsicoeducativo)
+                        }
                         _uiState.update {
                             it.copy(
                                 catalogo = habilidades,

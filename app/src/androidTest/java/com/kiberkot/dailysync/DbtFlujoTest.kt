@@ -6,7 +6,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.filters.SdkSuppress
 import com.kiberkot.dailysync.data.local.AppDatabase
-import com.kiberkot.dailysync.data.repository.DbtRepository
 import com.kiberkot.dailysync.navigation.AppNavigation
 import com.kiberkot.dailysync.ui.theme.DailySyncTheme
 import kotlinx.coroutines.flow.first
@@ -37,15 +36,15 @@ class DbtFlujoTest {
     @After fun limpiar() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val dao = AppDatabase.getDatabase(context).dailySyncDao()
-        dao.observarDbtPorUsuario(DbtRepository.USUARIO_DEMO).first()
+        dao.observarDbtPorUsuario(AppDatabase.USUARIO_DEMO).first()
             .filter { it.situacionAsociada == contexto || it.situacionAsociada == corregido }
-            .forEach { dao.eliminarDbtDelUsuario(it.idRegistro, DbtRepository.USUARIO_DEMO) }
+            .forEach { dao.eliminarDbtDelUsuario(it.idRegistro, AppDatabase.USUARIO_DEMO) }
     }
 
     @Test fun loginCatalogoValidacionGuardarEditarHistorialYEliminar() {
         compose.setContent { DailySyncTheme { AppNavigation() } }
-        compose.onNodeWithText("Usuario o Correo").performTextInput(DbtRepository.USUARIO_DEMO)
-        compose.onNodeWithText("Contraseña").performTextInput("demo")
+        compose.onNodeWithText("Usuario o Correo").performTextInput(AppDatabase.USUARIO_DEMO)
+        compose.onNodeWithText("Contraseña").performTextInput("1234")
         compose.onNodeWithText("Iniciar Sesión").performScrollTo().performClick()
         esperar("Ámbitos de autorreporte")
         compose.onNodeWithText("Habilidades DBT").performScrollTo().performClick()
@@ -59,25 +58,29 @@ class DbtFlujoTest {
         compose.onNodeWithTag("dbt_contenido").performScrollToNode(hasTestTag("dbt_situacion"))
         compose.onNodeWithTag("dbt_situacion").performTextInput(contexto)
         pulsarDbt("Guardar práctica")
-        esperar("Detalle de práctica")
+        esperar("Ámbitos de autorreporte")
+        compose.onNodeWithText("Historial").performClick()
+        esperar("Mi historial")
+        esperar(contexto)
+        compose.onAllNodesWithText("Ver detalle").onFirst().performScrollTo().performClick()
+        esperar("Detalle de Práctica DBT")
         compose.onNodeWithText(contexto).assertExists()
-        pulsarDbt("Editar práctica")
+        compose.onNodeWithText("Editar Registro").performScrollTo().performClick()
         esperar("Editar práctica")
         compose.onNodeWithTag("dbt_contenido").performScrollToNode(hasTestTag("dbt_situacion"))
         compose.onNodeWithTag("dbt_situacion").performTextReplacement(corregido)
         pulsarDbt("Guardar cambios")
-        esperar("Detalle de práctica")
+        esperar("Detalle de Práctica DBT")
         esperar(corregido)
-        pulsarDbt("Ver historial")
+        compose.onNodeWithContentDescription("Volver").performClick()
         esperar("Mi historial")
         esperar(corregido)
-        compose.onAllNodesWithText("Ver detalle").onFirst().performScrollTo().performClick()
-        esperar("Detalle de práctica")
-        pulsarDbt("Eliminar práctica")
+        compose.onAllNodesWithText("Eliminar").onFirst().performScrollTo().performClick()
         compose.onNodeWithText("Cancelar").performClick()
-        compose.onNodeWithText("Detalle de práctica").assertExists()
-        pulsarDbt("Eliminar práctica")
-        compose.onNodeWithText("Eliminar").performClick()
+        compose.onNodeWithText(corregido).assertExists()
+        compose.onAllNodesWithText("Eliminar").onFirst().performScrollTo().performClick()
+        compose.onNodeWithText("Eliminar registro").assertIsDisplayed()
+        compose.onAllNodesWithText("Eliminar").onLast().performClick()
         esperar("Mi historial")
         compose.waitUntil(15_000) { compose.onAllNodesWithText(corregido).fetchSemanticsNodes().isEmpty() }
     }

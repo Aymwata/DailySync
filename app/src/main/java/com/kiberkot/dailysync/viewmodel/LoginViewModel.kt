@@ -116,6 +116,6 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun resetearEstadoLogin() {
-        _uiState.update { it.copy(loginExitoso = false) }
+        _uiState.update { it.copy(loginExitoso = false, password = "") }
     }
 }

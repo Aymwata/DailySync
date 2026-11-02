@@ -4,9 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.kiberkot.dailysync.data.local.AppDatabase
-import com.kiberkot.dailysync.data.local.entities.CatalogoAnimoEntity
 import com.kiberkot.dailysync.data.local.entities.RegistroAnimoEntity
-import com.kiberkot.dailysync.data.local.entities.UsuarioPruebaEntity
 import com.kiberkot.dailysync.model.CategoriaAnimo
 import com.kiberkot.dailysync.model.RegistroAnimo
 import com.kiberkot.dailysync.utils.NotificationHelper
@@ -56,31 +54,9 @@ class AnimoViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         viewModelScope.launch {
-            val usuarioExistente = dao.obtenerUsuario("usr_demo_01")
-            if (usuarioExistente == null || usuarioExistente.correo.isBlank() || usuarioExistente.password.isBlank()) {
-                dao.insertarUsuario(
-                    UsuarioPruebaEntity(
-                        idUsuario = "usr_demo_01",
-                        aliasFicticio = "UsuarioPrueba",
-                        correo = "demo@dailysync.app",
-                        password = "1234",
-                        tokenSesion = "token_ficticio_123",
-                        recordatorioActivo = true,
-                        horaRecordatorio = "20:00"
-                    )
-                )
-                dao.insertarCatalogoAnimo(
-                    CATALOGO_ANIMO_DEFAULT.map {
-                        CatalogoAnimoEntity(idCategoria = it.id, nombreCategoria = it.nombre)
-                    }
-                )
-            }
-        }
-
-        viewModelScope.launch {
             combine(
                 dao.obtenerCatalogoAnimo(),
-                dao.obtenerRegistrosAnimo()
+                dao.observarAnimoPorUsuario(AppDatabase.USUARIO_DEMO)
             ) { catalogoEntities, registroEntities ->
                 val categoriasActuales = if (catalogoEntities.isNotEmpty()) {
                     catalogoEntities.map { entity ->
@@ -140,7 +116,7 @@ class AnimoViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
             } else {
-                val entities = dao.obtenerRegistrosAnimo().firstOrNull() ?: emptyList()
+                val entities = dao.observarAnimoPorUsuario(AppDatabase.USUARIO_DEMO).firstOrNull() ?: emptyList()
                 val entity = entities.find { it.idRegistro == registroId }
                 if (entity != null) {
                     val catEntities = dao.obtenerCatalogoAnimo().firstOrNull() ?: emptyList()
@@ -203,10 +179,6 @@ class AnimoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun ocultarBanner() {
-        _uiState.update { it.copy(bannerExitoVisible = false) }
-    }
-
     fun guardarRegistro(onExito: () -> Unit): Boolean {
         val currentState = _uiState.value
 
@@ -241,7 +213,7 @@ class AnimoViewModel(application: Application) : AndroidViewModel(application) {
 
         val entidad = RegistroAnimoEntity(
             idRegistro = idFinal,
-            idUsuario = "usr_demo_01",
+            idUsuario = AppDatabase.USUARIO_DEMO,
             idCategoria = categoriaElegida.id,
             fechaHora = timestampActual,
             nivelIntensidad = currentState.nivelIntensidad.toInt(),
@@ -286,14 +258,4 @@ class AnimoViewModel(application: Application) : AndroidViewModel(application) {
         return true
     }
 
-    fun buscarPorId(id: String): RegistroAnimo? {
-        return _uiState.value.historial.find { it.id == id }
-    }
-
-    fun eliminarRegistro(id: String, onEliminado: () -> Unit) {
-        viewModelScope.launch {
-            dao.eliminarRegistroAnimoPorId(id)
-            onEliminado()
-        }
-    }
 }

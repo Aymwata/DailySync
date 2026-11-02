@@ -1,6 +1,8 @@
 package com.kiberkot.dailysync.data.local
 
+import android.content.ContentValues
 import android.content.Context
+import android.database.sqlite.SQLiteDatabase
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -17,11 +19,6 @@ import com.kiberkot.dailysync.data.local.entities.CatalogoNeuroEntity
 import com.kiberkot.dailysync.data.local.entities.RegistroNeuroEntity
 import com.kiberkot.dailysync.data.local.entities.CatalogoAdiccionEntity
 import com.kiberkot.dailysync.data.local.entities.RegistroAdiccionEntity
-
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-
 @Database(
     entities = [
         UsuarioPruebaEntity::class,
@@ -42,6 +39,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun dailySyncDao(): DailySyncDao
 
     companion object {
+
+        const val USUARIO_DEMO = "usr_demo_01"
 
         val catalogoAnimoInicial = listOf(
             CatalogoAnimoEntity(1, "Tranquilo / Calmo"),
@@ -153,46 +152,71 @@ abstract class AppDatabase : RoomDatabase() {
                 instance
             }
         }
+    }
 
-        private class PrepopulateCallback : RoomDatabase.Callback() {
-            override fun onCreate(db: SupportSQLiteDatabase) {
-                super.onCreate(db)
-                poblarDatosIniciales()
+    // Se ejecuta antes de entregar la base abierta al DAO: no hay cargas en paralelo.
+    internal class PrepopulateCallback : RoomDatabase.Callback() {
+        override fun onOpen(db: SupportSQLiteDatabase) {
+            super.onOpen(db)
+            db.beginTransaction()
+            try {
+                poblarDatosIniciales(db)
+                db.setTransactionSuccessful()
+            } finally {
+                db.endTransaction()
             }
+        }
 
-            override fun onOpen(db: SupportSQLiteDatabase) {
-                super.onOpen(db)
-                poblarDatosIniciales()
+        private fun poblarDatosIniciales(db: SupportSQLiteDatabase) {
+            val usuario = ContentValues().apply {
+                put("id_usuario", USUARIO_DEMO)
+                put("alias_ficticio", "UsuarioPrueba")
+                put("correo", "demo@dailysync.app")
+                put("password", "1234")
+                put("token_sesion", "token_ficticio_123")
+                put("recordatorio_activo", true)
+                put("hora_recordatorio", "20:00")
             }
+            db.insert("USUARIO_PRUEBA", SQLiteDatabase.CONFLICT_IGNORE, usuario)
+            // Completar instalaciones antiguas sin reemplazar el usuario ni borrar sus registros.
+            db.execSQL("""
+                UPDATE USUARIO_PRUEBA SET
+                    correo = CASE WHEN correo = '' THEN ? ELSE correo END,
+                    password = CASE WHEN password = '' THEN ? ELSE password END
+                WHERE id_usuario = ?
+            """, arrayOf("demo@dailysync.app", "1234", USUARIO_DEMO))
 
-            private fun poblarDatosIniciales() {
-                INSTANCE?.let { database ->
-                    CoroutineScope(Dispatchers.IO).launch {
-                        val dao = database.dailySyncDao()
-
-                        // Usuario Ficticio de Prueba Inicial (Contraseña: 1234)
-                        val demoUser = dao.obtenerUsuario("usr_demo_01")
-                        if (demoUser == null || demoUser.correo.isBlank() || demoUser.password.isBlank()) {
-                            dao.insertarUsuario(
-                                UsuarioPruebaEntity(
-                                    idUsuario = "usr_demo_01",
-                                    aliasFicticio = "UsuarioPrueba",
-                                    correo = "demo@dailysync.app",
-                                    password = "1234",
-                                    tokenSesion = "token_ficticio_123",
-                                    recordatorioActivo = true,
-                                    horaRecordatorio = "20:00"
-                                )
-                            )
-                        }
-
-                        dao.insertarCatalogoAnimo(catalogoAnimoInicial)
-                        dao.asegurarCatalogoDbt(catalogoDbtInicial)
-                        dao.insertarCatalogoNeuro(catalogoNeuroInicial)
-                        dao.insertarCatalogoAdiccion(catalogoAdiccionInicial)
-                    }
-                }
+            catalogoAnimoInicial.forEach { categoria ->
+                actualizarCatalogo(db, "CATALOGO_ANIMO", "id_categoria", categoria.idCategoria,
+                    ContentValues().apply { put("nombre_categoria", categoria.nombreCategoria) })
             }
+            catalogoDbtInicial.forEach { habilidad ->
+                actualizarCatalogo(db, "CATALOGO_DBT", "id_habilidad", habilidad.idHabilidad,
+                    ContentValues().apply {
+                        put("nombre_habilidad", habilidad.nombreHabilidad)
+                        put("modulo_dbt", habilidad.moduloDbt)
+                        put("contenido_psicoeducativo", habilidad.contenidoPsicoeducativo)
+                    })
+            }
+            catalogoNeuroInicial.forEach { estrategia ->
+                actualizarCatalogo(db, "CATALOGO_NEURO", "id_estrategia", estrategia.idEstrategia,
+                    ContentValues().apply { put("nombre_estrategia", estrategia.nombreEstrategia) })
+            }
+            catalogoAdiccionInicial.forEach { accion ->
+                actualizarCatalogo(db, "CATALOGO_ADICCION", "id_accion_protectora", accion.idAccionProtectora,
+                    ContentValues().apply { put("nombre_accion", accion.nombreAccion) })
+            }
+        }
+
+        private fun actualizarCatalogo(
+            db: SupportSQLiteDatabase, tabla: String, columnaId: String,
+            id: Int, valores: ContentValues
+        ) {
+            valores.put(columnaId, id)
+            db.insert(tabla, SQLiteDatabase.CONFLICT_IGNORE, valores)
+            // Actualizar la fila existente evita el DELETE implícito de REPLACE y su CASCADE.
+            db.update(tabla, SQLiteDatabase.CONFLICT_ABORT, valores,
+                "$columnaId = ?", arrayOf(id))
         }
     }
 }

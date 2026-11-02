@@ -7,7 +7,12 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.kiberkot.dailysync.data.local.AppDatabase
-import com.kiberkot.dailysync.data.repository.DbtRepository
+import com.kiberkot.dailysync.data.local.dao.DailySyncDao
+import com.kiberkot.dailysync.data.local.entities.RegistroDbtEntity
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.UUID
 import com.kiberkot.dailysync.model.FormularioDbt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -27,28 +32,40 @@ data class RegistroDbtUiState(
     val errores: Map<String, String> = emptyMap()
 )
 
-class RegistroDbtViewModel(application: Application) : AndroidViewModel(application) {
+class RegistroDbtViewModel @JvmOverloads constructor(
+    application: Application,
+    private val dao: DailySyncDao = AppDatabase.getDatabase(application).dailySyncDao()
+) : AndroidViewModel(application) {
     private val notificationHelper = NotificationHelper(application)
-    private val repository = DbtRepository(AppDatabase.getDatabase(application).dailySyncDao())
     private val _uiState = MutableStateFlow(RegistroDbtUiState())
     val uiState = _uiState.asStateFlow()
     private var observacion: Job? = null
     private var claveCarga: Triple<String, String?, Int?>? = null
 
-    fun cargar(usuarioId: String, registroId: String? = null, habilidadId: Int? = null, forzar: Boolean = false) {
+    fun cargar(usuarioId: String, registroId: String? = null, habilidadId: Int? = null) {
         val clave = Triple(usuarioId, registroId, habilidadId)
-        if (_uiState.value.procesando || (!forzar && claveCarga == clave && observacion?.isActive == true)) return
+        if (_uiState.value.procesando || (claveCarga == clave && observacion?.isActive == true)) return
         claveCarga = clave
         observacion?.cancel()
         _uiState.value = RegistroDbtUiState()
         observacion = viewModelScope.launch {
             try {
-                repository.prepararCatalogo()
-                repository.prepararUsuario(usuarioId)
-                val registros = if (registroId == null) flowOf(null) else repository.observarRegistro(registroId, usuarioId)
+                check(dao.obtenerUsuario(usuarioId) != null) { "El usuario no está disponible." }
+                val registros = if (registroId == null) flowOf(null) else dao.observarPracticaDbt(registroId, usuarioId)
                 var formularioInicializado = false
-                combine(repository.observarCatalogo(), registros) { catalogo, registro -> catalogo to registro }
-                    .collect { (catalogo, registro) ->
+                combine(dao.obtenerCatalogoDbt(), registros) { catalogo, registro -> catalogo to registro }
+                    .collect { (entidades, entidad) ->
+                        val catalogo = entidades.map {
+                            HabilidadDbt(it.idHabilidad, it.nombreHabilidad,
+                                it.moduloDbt, it.contenidoPsicoeducativo)
+                        }
+                        val registro = entidad?.let {
+                            val habilidad = catalogo.find { h -> h.id == it.idHabilidad }
+                            RegistroDbt(it.idRegistro, it.idUsuario, it.idHabilidad,
+                                habilidad?.nombre ?: "Habilidad DBT", habilidad?.modulo.orEmpty(),
+                                it.fechaHora, it.situacionAsociada, it.nivelIntensidad,
+                                it.utilidadPercibida, it.pendienteSync)
+                        }
                         _uiState.update { actual ->
                             val formulario = if (formularioInicializado) actual.formulario else {
                                 registro?.let { FormularioDbt(it.habilidadId, it.situacion, it.intensidad, it.utilidad) }
@@ -68,13 +85,31 @@ class RegistroDbtViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    fun reintentar() { claveCarga?.let { cargar(it.first, it.second, it.third, forzar = true) } }
+    private fun validarFormulario(
+        formulario: FormularioDbt,
+        habilidadesDisponibles: Set<Int>
+    ): Map<String, String> = buildMap {
+        if (formulario.habilidadId == null || formulario.habilidadId !in habilidadesDisponibles) {
+            put("habilidad", "Selecciona una habilidad del catálogo.")
+        }
+        if (formulario.situacion.trim().length !in 3..250) {
+            put("situacion", "Escribe entre 3 y 250 caracteres.")
+        }
+        if (formulario.intensidad !in 1..5) {
+            put("intensidad", "La intensidad debe estar entre 1 y 5.")
+        }
+        if (formulario.utilidad !in 1..5) {
+            put("utilidad", "La utilidad debe estar entre 1 y 5.")
+        }
+    }
 
     private fun cambiar(transformar: (FormularioDbt) -> FormularioDbt) {
         if (_uiState.value.procesando) return
         _uiState.update {
             val formulario = transformar(it.formulario)
-            val errores = if (it.errores.isEmpty()) emptyMap() else formulario.errores(it.catalogo.map { h -> h.id }.toSet())
+            val errores = if (it.errores.isEmpty()) emptyMap() else {
+                validarFormulario(formulario, it.catalogo.map { h -> h.id }.toSet())
+            }
             it.copy(formulario = formulario, errores = errores, error = null)
         }
     }
@@ -88,11 +123,39 @@ class RegistroDbtViewModel(application: Application) : AndroidViewModel(applicat
         val clave = claveCarga ?: return
         val actual = _uiState.value
         if (actual.cargando || actual.procesando) return
-        val errores = actual.formulario.errores(actual.catalogo.map { it.id }.toSet())
+        val errores = validarFormulario(actual.formulario, actual.catalogo.map { it.id }.toSet())
         _uiState.update { it.copy(errores = errores, error = null) }
         if (errores.isNotEmpty()) return
         ejecutar {
-            val id = repository.guardar(clave.first, clave.second, actual.formulario)
+            val usuarioId = clave.first
+            val registroId = clave.second
+            val formulario = actual.formulario
+            check(dao.obtenerUsuario(usuarioId) != null) { "El usuario no está disponible." }
+            val habilidad = formulario.habilidadId?.let { dao.buscarHabilidadDbt(it) }
+            require(validarFormulario(formulario, setOfNotNull(habilidad?.idHabilidad)).isEmpty()) {
+                "Revisa los datos del formulario."
+            }
+            val habilidadId = requireNotNull(formulario.habilidadId)
+            val id = if (registroId != null) {
+                check(dao.actualizarPracticaDbt(registroId, usuarioId, habilidadId,
+                    formulario.situacion.trim(), formulario.intensidad, formulario.utilidad) == 1) {
+                    "El registro ya no está disponible."
+                }
+                registroId
+            } else {
+                val nuevoId = UUID.randomUUID().toString()
+                dao.crearPracticaDbt(RegistroDbtEntity(
+                    idRegistro = nuevoId,
+                    idUsuario = usuarioId,
+                    idHabilidad = habilidadId,
+                    fechaHora = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.ROOT).format(Date()),
+                    situacionAsociada = formulario.situacion.trim(),
+                    nivelIntensidad = formulario.intensidad,
+                    utilidadPercibida = formulario.utilidad,
+                    pendienteSync = true
+                ))
+                nuevoId
+            }
             notificationHelper.mostrarNotificacionCheckIn(
                 "DailySync", if (clave.second != null) "Práctica DBT actualizada." else "Nueva práctica DBT guardada localmente."
             )
@@ -101,13 +164,6 @@ class RegistroDbtViewModel(application: Application) : AndroidViewModel(applicat
             _uiState.update { it.copy(bannerExitoVisible = false) }
             onExito(id)
         }
-    }
-
-    fun eliminar(onExito: () -> Unit) {
-        val clave = claveCarga ?: return
-        val registro = _uiState.value.registro ?: return
-        if (_uiState.value.procesando) return
-        ejecutar { repository.eliminar(clave.first, registro.id); onExito() }
     }
 
     private fun ejecutar(accion: suspend () -> Unit) {

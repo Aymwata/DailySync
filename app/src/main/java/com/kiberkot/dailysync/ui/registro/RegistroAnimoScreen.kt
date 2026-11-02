@@ -19,6 +19,7 @@ import com.kiberkot.dailysync.model.CategoriaAnimo
 import com.kiberkot.dailysync.ui.components.CategoriaChipGrid
 import com.kiberkot.dailysync.viewmodel.AnimoUiState
 
+/** Formulario compartido: editando=false crea un check-in; editando=true modifica uno existente. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RegistroAnimoScreen(
@@ -29,7 +30,6 @@ fun RegistroAnimoScreen(
     onCambioContexto: (String) -> Unit,
     onCambioNota: (String) -> Unit,
     onGuardar: () -> Unit,
-    onOcultarBanner: () -> Unit,
     onVolver: () -> Unit,
     modifier: Modifier = Modifier
 ) {

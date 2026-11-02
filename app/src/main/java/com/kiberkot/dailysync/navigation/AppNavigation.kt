@@ -15,7 +15,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.kiberkot.dailysync.data.repository.DbtRepository
+import com.kiberkot.dailysync.data.local.AppDatabase
 import com.kiberkot.dailysync.model.AmbitoRegistro
 import com.kiberkot.dailysync.ui.adiccion.AdiccionScreen
 import com.kiberkot.dailysync.ui.adiccion.DetalleAdiccionScreen
@@ -87,7 +87,7 @@ fun AppNavigation(
     val adiccionUiState by adiccionViewModel.uiState.collectAsState()
 
     val context = LocalContext.current
-    val usuarioDbtId = DbtRepository.USUARIO_DEMO
+    val usuarioDbtId = AppDatabase.USUARIO_DEMO
 
     LaunchedEffect(loginUiState.loginExitoso) {
         if (loginUiState.loginExitoso) {
@@ -188,7 +188,6 @@ fun AppNavigation(
                 onCambioContexto = animoViewModel::cambiarContexto,
                 onCambioNota = animoViewModel::cambiarNota,
                 onGuardar = { animoViewModel.guardarRegistro(onExito = { navController.popBackStack() }) },
-                onOcultarBanner = animoViewModel::ocultarBanner,
                 onVolver = { navController.popBackStack() }
             )
         }
@@ -225,7 +224,6 @@ fun AppNavigation(
                 onGuardar = {
                     animoViewModel.guardarRegistro(onExito = { navController.popBackStack() })
                 },
-                onOcultarBanner = animoViewModel::ocultarBanner,
                 onVolver = { navController.popBackStack() }
             )
         }
