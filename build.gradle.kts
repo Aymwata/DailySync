@@ -8,3 +8,6 @@ plugins {
     alias(libs.plugins.kotlin.compose) apply false
     alias(libs.plugins.ksp) apply false
 }
+
+// A plain gradlew invocation produces the optimized DailySync APK.
+defaultTasks(":app:assembleRelease")

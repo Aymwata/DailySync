@@ -1,6 +1,5 @@
 package com.kiberkot.dailysync.ui.neuro
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -11,15 +10,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
+import com.kiberkot.dailysync.ui.components.EstadoRegistro
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kiberkot.dailysync.ui.theme.DailySyncBrand
 import com.kiberkot.dailysync.viewmodel.NeuroUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -28,7 +28,8 @@ fun DetalleNeuroScreen(
     state: NeuroUiState,
     onEditar: () -> Unit,
     onVolver: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onReintentar: () -> Unit = {}
 ) {
     val estrategiaNombre = state.catalogoEstrategias.find {
         it.idEstrategia == state.idEstrategiaSeleccionada
@@ -36,34 +37,26 @@ fun DetalleNeuroScreen(
 
     Scaffold(
         modifier = modifier,
-        containerColor = DailySyncBrand.Background,
         topBar = {
             TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DailySyncBrand.Background,
-                    titleContentColor = DailySyncBrand.Ink,
-                    navigationIconContentColor = DailySyncBrand.Ink
-                ),
-                title = {
-                    Text(
-                        "Detalle de Autorregulación",
-                        fontFamily = DailySyncBrand.Font,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
+                title = { Text("Detalle de Autorregulación", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onVolver) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                     }
                 },
                 actions = {
-                    IconButton(onClick = onEditar) {
-                        Icon(Icons.Default.Edit, contentDescription = "Editar", tint = DailySyncBrand.Teal)
+                    IconButton(onClick = onEditar, enabled = !state.isLoading && !(state.cargaFallida || state.noDisponible)) {
+                        Icon(Icons.Default.Edit, contentDescription = "Editar")
                     }
                 }
             )
         }
     ) { paddingValues ->
+        if (state.isLoading || state.cargaFallida || state.noDisponible) {
+            EstadoRegistro(state.isLoading, state.errorMsg, onReintentar, Modifier.padding(paddingValues))
+            return@Scaffold
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -77,58 +70,51 @@ fun DetalleNeuroScreen(
                     .size(64.dp)
                     .align(Alignment.CenterHorizontally)
                     .clip(CircleShape)
-                    .background(DailySyncBrand.Teal.copy(alpha = 0.15f)),
+                    .background(Brush.horizontalGradient(listOf(Color(0xFF0288D1), Color(0xFF26C6DA)))),
                 contentAlignment = Alignment.Center
             ) {
                 Text("🧠", fontSize = 28.sp)
             }
 
-            TarjetaDetalleBrand(titulo = "Tipo de Actividad / Tarea", valor = state.tipoActividad.ifBlank { "Sin información" })
-            TarjetaDetalleBrand(titulo = "Fecha y Hora del Registro", valor = state.fechaHora.ifBlank { "Fecha reciente" })
-            TarjetaDetalleBrand(titulo = "Nivel de Sobrecarga Sensorial", valor = "${state.nivelSobrecarga} / 5")
-            TarjetaDetalleBrand(titulo = "Estrategia Aplicada", valor = estrategiaNombre)
-            TarjetaDetalleBrand(titulo = "Contexto / Entorno", valor = state.contexto.ifBlank { "Sin contexto registrado" })
-            TarjetaDetalleBrand(titulo = "Efectividad / Resultado", valor = "${state.resultadoPercibido} / 5")
+            TarjetaDetalle(titulo = "Tipo de Actividad / Tarea", valor = state.tipoActividad.ifBlank { "Sin información" })
+            TarjetaDetalle(titulo = "Fecha y Hora del Registro", valor = state.fechaHora.ifBlank { "Fecha reciente" })
+            TarjetaDetalle(titulo = "Nivel de Sobrecarga Sensorial", valor = "${state.nivelSobrecarga} / 5")
+            TarjetaDetalle(titulo = "Estrategia Aplicada", valor = estrategiaNombre)
+            TarjetaDetalle(titulo = "Contexto / Entorno", valor = state.contexto.ifBlank { "Sin contexto registrado" })
+            TarjetaDetalle(titulo = "Efectividad / Resultado", valor = "${state.resultadoPercibido} / 5")
 
             Button(
                 onClick = onEditar,
-                shape = RoundedCornerShape(18.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = DailySyncBrand.Teal, contentColor = Color.White),
+                shape = RoundedCornerShape(16.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp)
+                    .height(50.dp)
             ) {
                 Icon(Icons.Default.Edit, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Editar Registro", fontFamily = DailySyncBrand.Font, fontWeight = FontWeight.Bold)
+                Text("Editar Registro", fontWeight = FontWeight.Bold)
             }
         }
     }
 }
 
 @Composable
-private fun TarjetaDetalleBrand(titulo: String, valor: String) {
-    Surface(
+private fun TarjetaDetalle(titulo: String, valor: String) {
+    ElevatedCard(
         shape = RoundedCornerShape(16.dp),
-        color = DailySyncBrand.Field,
-        border = BorderStroke(1.dp, DailySyncBrand.Border),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = titulo,
-                fontFamily = DailySyncBrand.Font,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = DailySyncBrand.Teal
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = valor,
-                fontFamily = DailySyncBrand.Font,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = DailySyncBrand.Ink
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold
             )
         }
     }

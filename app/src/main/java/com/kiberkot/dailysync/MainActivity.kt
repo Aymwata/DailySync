@@ -9,6 +9,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.ViewModelProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import com.kiberkot.dailysync.viewmodel.LoginViewModel
 import com.kiberkot.dailysync.navigation.AppNavigation
 import com.kiberkot.dailysync.ui.theme.DailySyncTheme
 
@@ -19,12 +25,19 @@ class MainActivity : ComponentActivity() {
     ) { _ -> }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splash = installSplashScreen()
         super.onCreate(savedInstanceState)
-        solicitarPermisoNotificaciones()
+        val login = ViewModelProvider(this)[LoginViewModel::class.java]
+        splash.setKeepOnScreenCondition { login.uiState.value.restaurandoSesion }
+        splash.setOnExitAnimationListener { it.remove() }
         enableEdgeToEdge()
         setContent {
             DailySyncTheme {
-                AppNavigation()
+                val sesion by login.uiState.collectAsState()
+                LaunchedEffect(sesion.restaurandoSesion, sesion.errorSesion) {
+                    if (!sesion.restaurandoSesion && sesion.errorSesion == null) solicitarPermisoNotificaciones()
+                }
+                AppNavigation(login)
             }
         }
     }

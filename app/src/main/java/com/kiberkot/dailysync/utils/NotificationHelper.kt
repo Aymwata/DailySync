@@ -14,7 +14,9 @@ class NotificationHelper(private val context: Context) {
     private val channelId = "dailysync_checkin_channel"
 
     init {
-        crearCanalNotificacion()
+        try { crearCanalNotificacion() } catch (e: Exception) {
+            android.util.Log.w("DailySync", "No se pudo crear el canal de notificaciones", e)
+        }
     }
 
     private fun crearCanalNotificacion() {
@@ -33,6 +35,14 @@ class NotificationHelper(private val context: Context) {
     }
 
     fun mostrarNotificacionCheckIn(titulo: String, mensaje: String) {
+        try {
+            publicarNotificacion(titulo, mensaje)
+        } catch (e: Exception) {
+            android.util.Log.w("DailySync", "El registro se guardó, pero no se pudo notificar", e)
+        }
+    }
+
+    private fun publicarNotificacion(titulo: String, mensaje: String) {
         // Verificar permiso explícito en Android 13+ (API 33+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val tienePermiso = ContextCompat.checkSelfPermission(

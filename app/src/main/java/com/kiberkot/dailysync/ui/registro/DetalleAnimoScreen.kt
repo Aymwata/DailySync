@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
+import com.kiberkot.dailysync.ui.components.EstadoRegistro
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,7 +29,8 @@ fun DetalleAnimoScreen(
     registroId: String,
     onEditar: () -> Unit,
     onVolver: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onReintentar: () -> Unit = {}
 ) {
     val registro = state.historial.find { it.id == registroId }
     val emojiMap = mapOf(1 to "🧘", 2 to "🚀", 3 to "⚡", 4 to "🌧️", 5 to "💔")
@@ -45,13 +47,17 @@ fun DetalleAnimoScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onEditar) {
+                    IconButton(onClick = onEditar, enabled = !state.cargando && !(state.cargaFallida || state.noDisponible || registro == null)) {
                         Icon(Icons.Default.Edit, contentDescription = "Editar")
                     }
                 }
             )
         }
     ) { paddingValues ->
+        if (state.cargando || state.cargaFallida || state.noDisponible || registro == null) {
+            EstadoRegistro(state.cargando, state.error, onReintentar, Modifier.padding(paddingValues))
+            return@Scaffold
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()

@@ -1,6 +1,8 @@
 package com.kiberkot.dailysync.viewmodel
 
 import android.app.Application
+import com.kiberkot.dailysync.data.local.dao.DailySyncDao
+import kotlinx.coroutines.CancellationException
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.kiberkot.dailysync.data.local.AppDatabase
@@ -22,11 +24,14 @@ data class RegisterUiState(
     val errorCorreo: String? = null,
     val errorPassword: String? = null,
     val isLoading: Boolean = false,
-    val registroExitoso: Boolean = false
+    val registroExitoso: Boolean = false,
+    val error: String? = null
 )
 
-class RegisterViewModel(application: Application) : AndroidViewModel(application) {
-    private val dao = AppDatabase.getDatabase(application).dailySyncDao()
+class RegisterViewModel @JvmOverloads constructor(
+    application: Application,
+    private val dao: DailySyncDao = AppDatabase.getDatabase(application).dailySyncDao()
+) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(RegisterUiState())
     val uiState: StateFlow<RegisterUiState> = _uiState.asStateFlow()
@@ -62,6 +67,7 @@ class RegisterViewModel(application: Application) : AndroidViewModel(application
 
     fun registrarUsuario() {
         val state = _uiState.value
+        if (state.isLoading || state.registroExitoso) return
         var esValido = true
         var errId: String? = null
         var errAlias: String? = null
@@ -97,41 +103,46 @@ class RegisterViewModel(application: Application) : AndroidViewModel(application
             return
         }
 
-        _uiState.update { it.copy(isLoading = true) }
+        _uiState.update { it.copy(isLoading = true, error = null) }
 
         viewModelScope.launch {
-            val idBuscado = state.idUsuario.trim()
-            val correoBuscado = state.correo.trim()
+            try {
+                val idBuscado = state.idUsuario.trim()
+                val correoBuscado = state.correo.trim()
 
-            // Verificar si el ID o Correo ya existen en Room
-            val usuarioExistente = dao.obtenerUsuarioPorIdOCorreo(idBuscado)
-                ?: dao.obtenerUsuarioPorIdOCorreo(correoBuscado)
+                // Verificar si el ID o Correo ya existen en Room
+                val usuarioExistente = dao.obtenerUsuarioPorIdOCorreo(idBuscado)
+                    ?: dao.obtenerUsuarioPorIdOCorreo(correoBuscado)
 
-            if (usuarioExistente != null) {
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        errorId = if (usuarioExistente.idUsuario == idBuscado) "El ID ya se encuentra registrado." else null,
-                        errorCorreo = if (usuarioExistente.correo == correoBuscado) "El correo ya está registrado." else null
-                    )
+                if (usuarioExistente != null) {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorId = if (usuarioExistente.idUsuario == idBuscado) "El ID ya se encuentra registrado." else null,
+                            errorCorreo = if (usuarioExistente.correo == correoBuscado) "El correo ya está registrado." else null
+                        )
+                    }
+                    return@launch
                 }
-                return@launch
-            }
 
-            // Inserción de la nueva cuenta en la base de datos local
-            val nuevoUsuario = UsuarioPruebaEntity(
-                idUsuario = idBuscado,
-                aliasFicticio = state.aliasFicticio.trim(),
-                correo = correoBuscado,
-                password = state.password.trim(),
-                tokenSesion = "token_${System.currentTimeMillis()}",
-                recordatorioActivo = true,
-                horaRecordatorio = "20:00"
-            )
-            dao.insertarUsuario(nuevoUsuario)
+                // Inserción de la nueva cuenta en la base de datos local
+                val nuevoUsuario = UsuarioPruebaEntity(
+                    idUsuario = idBuscado,
+                    aliasFicticio = state.aliasFicticio.trim(),
+                    correo = correoBuscado,
+                    password = state.password.trim(),
+                    tokenSesion = "token_${System.currentTimeMillis()}",
+                    recordatorioActivo = true,
+                    horaRecordatorio = "20:00"
+                )
+                dao.insertarUsuario(nuevoUsuario)
 
-            _uiState.update {
-                it.copy(isLoading = false, registroExitoso = true)
+                _uiState.update {
+                    it.copy(isLoading = false, registroExitoso = true, password = "", isPasswordVisible = false)
+                }
+            } catch (e: CancellationException) { throw e
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoading = false, error = "No se pudo crear la cuenta. Intenta nuevamente.") }
             }
         }
     }
