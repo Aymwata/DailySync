@@ -116,6 +116,43 @@ fun NeuroScreen(
                 }
             }
 
+
+            val estrategiaSeleccionada = state.catalogoEstrategias.find { it.idEstrategia == state.idEstrategiaSeleccionada }
+            if (estrategiaSeleccionada != null) {
+                val descripcion = when {
+                    estrategiaSeleccionada.nombreEstrategia.contains("Pausa", ignoreCase = true) ->
+                        "Pausa Sensorial: Consiste en reducir estímulos auditivos y visuales por 10 a 15 minutos para disminuir el agotamiento cognitivo y restaurar la atención."
+                    estrategiaSeleccionada.nombreEstrategia.contains("Aislamiento", ignoreCase = true) ->
+                        "Aislamiento Acústico: Uso de audífonos con cancelación de ruido o tapones en entornos ruidosos para estabilizar el sistema auditivo."
+                    estrategiaSeleccionada.nombreEstrategia.contains("Presión", ignoreCase = true) ->
+                        "Presión Profunda: Aplicación de peso firme o mantas propioceptivas para enviar señales de calma al sistema nervioso central."
+                    estrategiaSeleccionada.nombreEstrategia.contains("Movimiento", ignoreCase = true) ->
+                        "Movimiento Rítmico (Stimming): Balanceos posturales o estimulación táctil regulada para canalizar el exceso de hiperactividad o ansiedad."
+                    else -> "Técnica de autorregulación guiada para estabilizar el procesamiento sensorial y reducir el estrés."
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+                Card(
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text(
+                            text = "💡 ¿Cómo aplicar esta estrategia?",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = descripcion,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
@@ -166,4 +203,4 @@ fun NeuroScreen(
             }
         }
     }
-    }
+}

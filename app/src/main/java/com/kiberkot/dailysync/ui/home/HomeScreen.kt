@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.List
@@ -29,24 +30,25 @@ fun HomeScreen(
     state: HomeUiState,
     onAbrirModulo: (ModuloHome) -> Unit,
     onAbrirSeccion: (SeccionHome) -> Unit,
+    onCerrarSesion: () -> Unit = {},
     onReintentar: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    var mostrarSelector by rememberSaveable {
-        mutableStateOf(false)
-    }
+    var mostrarSelector by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            CabeceraHome(iniciales = state.iniciales)
+            CabeceraHome(
+                iniciales = state.iniciales,
+                onCerrarSesion = onCerrarSesion
+            )
         },
         bottomBar = {
             BarraInferiorHome(onAbrirSeccion = onAbrirSeccion)
         }
     ) { innerPadding ->
-
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -55,15 +57,12 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             item {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         text = state.fecha,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-
                     Text(
                         text = state.saludo,
                         style = MaterialTheme.typography.headlineSmall,
@@ -109,9 +108,7 @@ fun HomeScreen(
                     .drop(fila * 2)
                     .take(2)
 
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     modulos.forEach { modulo ->
                         TarjetaModulo(
                             modulo = modulo,
@@ -133,9 +130,7 @@ fun HomeScreen(
     }
 
     if (mostrarSelector) {
-        ModalBottomSheet(
-            onDismissRequest = { mostrarSelector = false }
-        ) {
+        ModalBottomSheet(onDismissRequest = { mostrarSelector = false }) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -166,7 +161,10 @@ fun HomeScreen(
 }
 
 @Composable
-private fun CabeceraHome(iniciales: String) {
+private fun CabeceraHome(
+    iniciales: String,
+    onCerrarSesion: () -> Unit
+) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
         shadowElevation = 2.dp
@@ -185,7 +183,6 @@ private fun CabeceraHome(iniciales: String) {
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
-
                 Text(
                     text = "Lemac DataLab",
                     style = MaterialTheme.typography.labelMedium,
@@ -194,15 +191,9 @@ private fun CabeceraHome(iniciales: String) {
             }
 
             Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Guardado local",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
                 Surface(
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.primaryContainer
@@ -218,25 +209,28 @@ private fun CabeceraHome(iniciales: String) {
                         )
                     }
                 }
+
+                IconButton(onClick = onCerrarSesion) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                        contentDescription = "Cerrar sesión",
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun ActividadSemanalCard(
-    dias: List<ActividadDiaUi>
-) {
+private fun ActividadSemanalCard(dias: List<ActividadDiaUi>) {
     val total = dias.sumOf { it.cantidad }
-    val maximo = dias.maxOfOrNull { it.cantidad }
-        ?.coerceAtLeast(1) ?: 1
+    val maximo = dias.maxOfOrNull { it.cantidad }?.coerceAtLeast(1) ?: 1
 
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -247,7 +241,6 @@ private fun ActividadSemanalCard(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
-
             Text(
                 text = "$total registros",
                 style = MaterialTheme.typography.bodyMedium,
@@ -271,7 +264,6 @@ private fun ActividadSemanalCard(
                                 text = "${dia.cantidad}",
                                 style = MaterialTheme.typography.labelSmall
                             )
-
                             Box(
                                 modifier = Modifier.height(64.dp),
                                 contentAlignment = Alignment.BottomCenter
@@ -279,26 +271,15 @@ private fun ActividadSemanalCard(
                                 Surface(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(
-                                            (4f + 60f * dia.cantidad / maximo).dp
-                                        ),
+                                        .height((4f + 60f * dia.cantidad / maximo).dp),
                                     shape = RoundedCornerShape(6.dp),
-                                    color = if (dia.esHoy) {
-                                        MaterialTheme.colorScheme.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.primaryContainer
-                                    }
+                                    color = if (dia.esHoy) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer
                                 ) {}
                             }
-
                             Text(
                                 text = dia.etiqueta,
                                 style = MaterialTheme.typography.labelSmall,
-                                fontWeight = if (dia.esHoy) {
-                                    FontWeight.Bold
-                                } else {
-                                    FontWeight.Normal
-                                }
+                                fontWeight = if (dia.esHoy) FontWeight.Bold else FontWeight.Normal
                             )
                         }
                     }
@@ -315,55 +296,31 @@ private fun TarjetaModulo(
     modifier: Modifier = Modifier
 ) {
     val fondo = when (modulo) {
-        ModuloHome.ANIMO ->
-            MaterialTheme.colorScheme.primaryContainer
-
-        ModuloHome.DBT ->
-            MaterialTheme.colorScheme.secondaryContainer
-
-        ModuloHome.NEURODESARROLLO ->
-            MaterialTheme.colorScheme.tertiaryContainer
-
-        ModuloHome.ADICCIONES ->
-            MaterialTheme.colorScheme.surfaceVariant
+        ModuloHome.ANIMO -> MaterialTheme.colorScheme.primaryContainer
+        ModuloHome.DBT -> MaterialTheme.colorScheme.secondaryContainer
+        ModuloHome.NEURODESARROLLO -> MaterialTheme.colorScheme.tertiaryContainer
+        ModuloHome.ADICCIONES -> MaterialTheme.colorScheme.surfaceVariant
     }
 
     Card(
         onClick = onClick,
         modifier = modifier.heightIn(min = 132.dp),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = fondo,
-            contentColor = contentColorFor(fondo)
-        )
+        colors = CardDefaults.cardColors(containerColor = fondo, contentColor = contentColorFor(fondo))
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text(
-                text = modulo.simbolo,
-                style = MaterialTheme.typography.headlineSmall
-            )
-
-            Text(
-                text = modulo.titulo,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold
-            )
-
-            Text(
-                text = "Registrar →",
-                style = MaterialTheme.typography.labelMedium
-            )
+            Text(text = modulo.simbolo, style = MaterialTheme.typography.headlineSmall)
+            Text(text = modulo.titulo, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(text = "Registrar →", style = MaterialTheme.typography.labelMedium)
         }
     }
 }
 
 @Composable
-private fun BarraInferiorHome(
-    onAbrirSeccion: (SeccionHome) -> Unit
-) {
+private fun BarraInferiorHome(onAbrirSeccion: (SeccionHome) -> Unit) {
     NavigationBar {
         SeccionHome.entries.forEach { seccion ->
             val icono = when (seccion) {
@@ -372,7 +329,6 @@ private fun BarraInferiorHome(
                 SeccionHome.CONTENIDOS -> Icons.Default.Info
                 SeccionHome.AJUSTES -> Icons.Default.Settings
             }
-
             val titulo = when (seccion) {
                 SeccionHome.INICIO -> "Inicio"
                 SeccionHome.HISTORIAL -> "Historial"
@@ -383,24 +339,14 @@ private fun BarraInferiorHome(
             NavigationBarItem(
                 selected = seccion == SeccionHome.INICIO,
                 onClick = { onAbrirSeccion(seccion) },
-                icon = {
-                    Icon(
-                        imageVector = icono,
-                        contentDescription = null
-                    )
-                },
+                icon = { Icon(imageVector = icono, contentDescription = null) },
                 label = { Text(titulo) }
             )
         }
     }
 }
 
-@Preview(
-    showBackground = true,
-    showSystemUi = true,
-    widthDp = 390,
-    heightDp = 844
-)
+@Preview(showBackground = true, showSystemUi = true, widthDp = 390, heightDp = 844)
 @Composable
 private fun HomeScreenPreview() {
     DailySyncTheme(darkTheme = false) {

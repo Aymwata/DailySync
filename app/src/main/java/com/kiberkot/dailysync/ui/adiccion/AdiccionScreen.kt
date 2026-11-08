@@ -116,6 +116,43 @@ fun AdiccionScreen(
                 }
             }
 
+
+            val accionSeleccionada = state.catalogoAcciones.find { it.idAccionProtectora == state.idAccionSeleccionada }
+            if (accionSeleccionada != null) {
+                val descripcion = when {
+                    accionSeleccionada.nombreAccion.contains("Surf", ignoreCase = true) || accionSeleccionada.nombreAccion.contains("Ola", ignoreCase = true) ->
+                        "Surfear la Ola (Urge Surfing): Observa la necesidad sin actuar durante 15 minutos. Comprende que el impulso sube a una cima y luego desciende naturalmente."
+                    accionSeleccionada.nombreAccion.contains("Entorno", ignoreCase = true) || accionSeleccionada.nombreAccion.contains("Cambio", ignoreCase = true) ->
+                        "Cambio de Entorno: Abandona el lugar físico o apaga el estímulo disparador inmediatamente para romper el bucle de la compulsión."
+                    accionSeleccionada.nombreAccion.contains("Soporte", ignoreCase = true) || accionSeleccionada.nombreAccion.contains("Contacto", ignoreCase = true) ->
+                        "Contacto de Soporte: Llama o escribe a una persona de confianza declarando el impulso abiertamente para diluir la urgencia emocional."
+                    accionSeleccionada.nombreAccion.contains("Sensorial", ignoreCase = true) || accionSeleccionada.nombreAccion.contains("Contraste", ignoreCase = true) ->
+                        "Estímulo Sensorial de Contraste: Utiliza agua fría en el rostro o hielo en las manos para activar la respuesta vagal y frenar el craving."
+                    else -> "Acción preventiva de contención diseñada para proteger tu proceso de autocontrol y evitar la recaída."
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+                Card(
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text(
+                            text = "🛡️ Guía de la acción protectora",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = descripcion,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
             Text("Cumplimiento de Objetivo", style = MaterialTheme.typography.titleMedium, modifier = Modifier.align(Alignment.Start))
             Spacer(modifier = Modifier.height(8.dp))
@@ -152,4 +189,4 @@ fun AdiccionScreen(
             }
         }
     }
-    }
+}
