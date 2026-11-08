@@ -1,7 +1,9 @@
 package com.kiberkot.dailysync.ui.adiccion
 
-import com.kiberkot.dailysync.ui.components.AvisoRegistroGuardado
-
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -10,16 +12,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kiberkot.dailysync.ui.components.AvisoRegistroGuardado
+import com.kiberkot.dailysync.ui.theme.DailySyncBrand
 import com.kiberkot.dailysync.viewmodel.AdiccionUiState
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
@@ -38,10 +42,22 @@ fun AdiccionScreen(
     val opcionesObjetivo = listOf("Logrado", "En proceso", "Resistido")
 
     Scaffold(
-        modifier = Modifier.imePadding(),
+        modifier = modifier.imePadding(),
+        containerColor = DailySyncBrand.Background,
         topBar = {
             TopAppBar(
-                title = { Text(if (editando) "Editar Craving" else "Adicciones y Craving", fontWeight = FontWeight.Bold) },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = DailySyncBrand.Background,
+                    titleContentColor = DailySyncBrand.Ink,
+                    navigationIconContentColor = DailySyncBrand.Ink
+                ),
+                title = {
+                    Text(
+                        text = if (editando) "Editar Craving" else "Adicciones y Craving",
+                        fontFamily = DailySyncBrand.Font,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onVolver) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
@@ -51,128 +67,274 @@ fun AdiccionScreen(
         }
     ) { paddingValues ->
         Column(
-            modifier = modifier
+            modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
                 .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Box(
-                modifier = Modifier
-                    .size(72.dp)
-                    .clip(CircleShape)
-                    .background(Brush.horizontalGradient(listOf(Color(0xFFE53935), Color(0xFFFF7043)))),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("🛡️", fontSize = 32.sp)
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Registro de Craving", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+            // Header
+            Surface(
+                shape = RoundedCornerShape(22.dp),
+                color = DailySyncBrand.Field,
+                border = BorderStroke(1.dp, DailySyncBrand.Border),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Nivel de Impulso / Craving: ${state.nivelImpulso} / 10", fontWeight = FontWeight.SemiBold)
-                    Slider(
-                        value = state.nivelImpulso.toFloat(),
-                        onValueChange = { onCambioImpulso(it.toInt()) },
-                        valueRange = 1f..10f,
-                        steps = 8
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            OutlinedTextField(
-                value = state.desencadenante,
-                onValueChange = onCambioDesencadenante,
-                label = { Text("Desencadenante / Gatillo") },
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Acción Protectora", style = MaterialTheme.typography.titleMedium, modifier = Modifier.align(Alignment.Start))
-            Spacer(modifier = Modifier.height(8.dp))
-
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                state.catalogoAcciones.forEach { acc ->
-                    FilterChip(
-                        selected = state.idAccionSeleccionada == acc.idAccionProtectora,
-                        onClick = { onSeleccionarAccion(acc.idAccionProtectora) },
-                        label = { Text(acc.nombreAccion) }
-                    )
-                }
-            }
-
-
-            val accionSeleccionada = state.catalogoAcciones.find { it.idAccionProtectora == state.idAccionSeleccionada }
-            if (accionSeleccionada != null) {
-                val descripcion = when {
-                    accionSeleccionada.nombreAccion.contains("Surf", ignoreCase = true) || accionSeleccionada.nombreAccion.contains("Ola", ignoreCase = true) ->
-                        "Surfear la Ola (Urge Surfing): Observa la necesidad sin actuar durante 15 minutos. Comprende que el impulso sube a una cima y luego desciende naturalmente."
-                    accionSeleccionada.nombreAccion.contains("Entorno", ignoreCase = true) || accionSeleccionada.nombreAccion.contains("Cambio", ignoreCase = true) ->
-                        "Cambio de Entorno: Abandona el lugar físico o apaga el estímulo disparador inmediatamente para romper el bucle de la compulsión."
-                    accionSeleccionada.nombreAccion.contains("Soporte", ignoreCase = true) || accionSeleccionada.nombreAccion.contains("Contacto", ignoreCase = true) ->
-                        "Contacto de Soporte: Llama o escribe a una persona de confianza declarando el impulso abiertamente para diluir la urgencia emocional."
-                    accionSeleccionada.nombreAccion.contains("Sensorial", ignoreCase = true) || accionSeleccionada.nombreAccion.contains("Contraste", ignoreCase = true) ->
-                        "Estímulo Sensorial de Contraste: Utiliza agua fría en el rostro o hielo en las manos para activar la respuesta vagal y frenar el craving."
-                    else -> "Acción preventiva de contención diseñada para proteger tu proceso de autocontrol y evitar la recaída."
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-                Card(
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f)),
-                    modifier = Modifier.fillMaxWidth()
+                Row(
+                    modifier = Modifier.padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .size(54.dp)
+                            .clip(CircleShape)
+                            .background(DailySyncBrand.Error.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("🛡️", fontSize = 28.sp)
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
                         Text(
-                            text = "🛡️ Guía de la acción protectora",
-                            style = MaterialTheme.typography.titleSmall,
+                            text = "Registro de Craving",
+                            fontFamily = DailySyncBrand.Font,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.secondary
+                            fontSize = 17.sp,
+                            color = DailySyncBrand.Ink
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = descripcion,
-                            style = MaterialTheme.typography.bodySmall
+                            text = "Monitorea impulsos y aplica acciones protectoras.",
+                            fontFamily = DailySyncBrand.Font,
+                            fontSize = 13.sp,
+                            color = DailySyncBrand.Muted
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Cumplimiento de Objetivo", style = MaterialTheme.typography.titleMedium, modifier = Modifier.align(Alignment.Start))
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                opcionesObjetivo.forEach { obj ->
-                    FilterChip(
-                        selected = state.estadoObjetivo == obj,
-                        onClick = { onCambioEstadoObjetivo(obj) },
-                        label = { Text(obj) }
+            // Nivel de Impulso
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = DailySyncBrand.Field,
+                border = BorderStroke(1.dp, DailySyncBrand.Border),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Nivel de Impulso / Craving",
+                            fontFamily = DailySyncBrand.Font,
+                            fontWeight = FontWeight.SemiBold,
+                            color = DailySyncBrand.Ink
+                        )
+                        Text(
+                            text = "${state.nivelImpulso} / 10",
+                            fontFamily = DailySyncBrand.Font,
+                            fontWeight = FontWeight.Bold,
+                            color = DailySyncBrand.Error
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Slider(
+                        value = state.nivelImpulso.toFloat(),
+                        onValueChange = { onCambioImpulso(it.toInt()) },
+                        valueRange = 1f..10f,
+                        steps = 8,
+                        colors = SliderDefaults.colors(
+                            thumbColor = DailySyncBrand.Error,
+                            activeTrackColor = DailySyncBrand.Error,
+                            inactiveTrackColor = DailySyncBrand.Border
+                        )
                     )
                 }
             }
 
-            state.errorMsg?.let {
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(it, color = MaterialTheme.colorScheme.error)
+            // Desencadenante
+            OutlinedTextField(
+                value = state.desencadenante,
+                onValueChange = onCambioDesencadenante,
+                label = {
+                    Text(
+                        "Desencadenante / Gatillo",
+                        fontFamily = DailySyncBrand.Font,
+                        color = DailySyncBrand.Muted
+                    )
+                },
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = DailySyncBrand.Field,
+                    unfocusedContainerColor = DailySyncBrand.Field,
+                    focusedBorderColor = DailySyncBrand.Teal,
+                    unfocusedBorderColor = DailySyncBrand.Border,
+                    focusedTextColor = DailySyncBrand.Ink,
+                    unfocusedTextColor = DailySyncBrand.Ink
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            // Acción Protectora + Guía Explicativa
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Acción Protectora",
+                    fontFamily = DailySyncBrand.Font,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = DailySyncBrand.Ink,
+                    modifier = Modifier.align(Alignment.Start)
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    state.catalogoAcciones.forEach { acc ->
+                        val seleccionada = state.idAccionSeleccionada == acc.idAccionProtectora
+                        FilterChip(
+                            selected = seleccionada,
+                            onClick = { onSeleccionarAccion(acc.idAccionProtectora) },
+                            label = {
+                                Text(
+                                    text = acc.nombreAccion,
+                                    fontFamily = DailySyncBrand.Font,
+                                    fontWeight = if (seleccionada) FontWeight.Bold else FontWeight.Medium
+                                )
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = DailySyncBrand.Teal,
+                                selectedLabelColor = Color.White,
+                                containerColor = DailySyncBrand.Field,
+                                labelColor = DailySyncBrand.Ink
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = seleccionada,
+                                borderColor = DailySyncBrand.Border,
+                                selectedBorderColor = DailySyncBrand.Teal
+                            )
+                        )
+                    }
+                }
+
+                val accionSeleccionada = state.catalogoAcciones.find { it.idAccionProtectora == state.idAccionSeleccionada }
+                AnimatedVisibility(
+                    visible = accionSeleccionada != null,
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    accionSeleccionada?.let { acc ->
+                        val descripcion = when {
+                            acc.nombreAccion.contains("Surf", ignoreCase = true) || acc.nombreAccion.contains("Ola", ignoreCase = true) ->
+                                "Surfear la Ola (Urge Surfing): Observa la necesidad sin actuar durante 15 minutos. Comprende que el impulso sube a una cima y luego desciende naturalmente."
+                            acc.nombreAccion.contains("Entorno", ignoreCase = true) || acc.nombreAccion.contains("Cambio", ignoreCase = true) ->
+                                "Cambio de Entorno: Abandona el lugar físico o apaga el estímulo disparador inmediatamente para romper el bucle de la compulsión."
+                            acc.nombreAccion.contains("Soporte", ignoreCase = true) || acc.nombreAccion.contains("Contacto", ignoreCase = true) ->
+                                "Contacto de Soporte: Llama o escribe a una persona de confianza declarando el impulso abiertamente para diluir la urgencia emocional."
+                            acc.nombreAccion.contains("Sensorial", ignoreCase = true) || acc.nombreAccion.contains("Contraste", ignoreCase = true) ->
+                                "Estímulo Sensorial de Contraste: Utiliza agua fría en el rostro o hielo en las manos para activar la respuesta vagal y frenar el craving."
+                            else -> "Acción preventiva de contención diseñada para proteger tu proceso de autocontrol y evitar la recaída."
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = DailySyncBrand.Teal.copy(alpha = 0.08f),
+                            border = BorderStroke(1.dp, DailySyncBrand.Teal.copy(alpha = 0.3f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(14.dp),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = null,
+                                    tint = DailySyncBrand.Teal,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = "🛡️ Guía de la acción protectora",
+                                        fontFamily = DailySyncBrand.Font,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        color = DailySyncBrand.Ink
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = descripcion,
+                                        fontFamily = DailySyncBrand.Font,
+                                        fontSize = 13.sp,
+                                        color = DailySyncBrand.Ink.copy(alpha = 0.85f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            // Cumplimiento de Objetivo
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Cumplimiento de Objetivo",
+                    fontFamily = DailySyncBrand.Font,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = DailySyncBrand.Ink,
+                    modifier = Modifier.align(Alignment.Start)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    opcionesObjetivo.forEach { obj ->
+                        val seleccionado = state.estadoObjetivo == obj
+                        FilterChip(
+                            selected = seleccionado,
+                            onClick = { onCambioEstadoObjetivo(obj) },
+                            label = {
+                                Text(
+                                    text = obj,
+                                    fontFamily = DailySyncBrand.Font,
+                                    fontWeight = if (seleccionado) FontWeight.Bold else FontWeight.Medium
+                                )
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = DailySyncBrand.Emerald,
+                                selectedLabelColor = Color.White,
+                                containerColor = DailySyncBrand.Field,
+                                labelColor = DailySyncBrand.Ink
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = seleccionado,
+                                borderColor = DailySyncBrand.Border,
+                                selectedBorderColor = DailySyncBrand.Emerald
+                            )
+                        )
+                    }
+                }
+            }
+
+            state.errorMsg?.let {
+                Text(
+                    text = it,
+                    fontFamily = DailySyncBrand.Font,
+                    color = DailySyncBrand.Error,
+                    fontSize = 13.sp
+                )
+            }
 
             AvisoRegistroGuardado(
                 visible = state.guardadoExitoso, editando = editando
@@ -181,11 +343,27 @@ fun AdiccionScreen(
             Button(
                 onClick = onGuardar,
                 enabled = !state.isLoading && !state.guardadoExitoso,
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth().height(52.dp)
+                shape = RoundedCornerShape(18.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = DailySyncBrand.Teal,
+                    contentColor = Color.White,
+                    disabledContainerColor = DailySyncBrand.Border,
+                    disabledContentColor = DailySyncBrand.Muted
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp)
             ) {
-                if (state.isLoading) CircularProgressIndicator(color = Color.White)
-                else Text(if (editando) "Guardar Cambios" else "Guardar Registro", fontWeight = FontWeight.Bold)
+                if (state.isLoading) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                } else {
+                    Text(
+                        text = if (editando) "Guardar Cambios" else "Guardar Registro",
+                        fontFamily = DailySyncBrand.Font,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                }
             }
         }
     }

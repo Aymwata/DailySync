@@ -1,21 +1,29 @@
 package com.kiberkot.dailysync.ui.historial
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.kiberkot.dailysync.model.AmbitoRegistro
 import com.kiberkot.dailysync.model.RegistroHistorial
-import com.kiberkot.dailysync.viewmodel.HistorialUiState
+import com.kiberkot.dailysync.ui.theme.DailySyncBrand
 import com.kiberkot.dailysync.utils.formatearFechaRegistro
+import com.kiberkot.dailysync.viewmodel.HistorialUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,60 +43,78 @@ fun HistorialScreen(
 
     Scaffold(
         modifier = modifier,
+        containerColor = DailySyncBrand.Background,
         topBar = {
             TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = DailySyncBrand.Background,
+                    titleContentColor = DailySyncBrand.Ink,
+                    navigationIconContentColor = DailySyncBrand.Ink
+                ),
                 title = {
                     Column {
                         Text(
                             text = "DailySync",
-                            style = MaterialTheme.typography.labelMedium
+                            fontFamily = DailySyncBrand.Font,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = DailySyncBrand.Muted
                         )
                         Text(
                             text = "Mi historial",
-                            fontWeight = FontWeight.Bold
+                            fontFamily = DailySyncBrand.Font,
+                            fontWeight = FontWeight.Bold,
+                            color = DailySyncBrand.Ink
                         )
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onVolver) {
                         Icon(
-                            imageVector =
-                                Icons.AutoMirrored.Filled.ArrowBack,
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Volver al inicio"
                         )
                     }
                 },
                 actions = {
-                    Text(
-                        text = "${visibles.size} registros",
-                        modifier = Modifier.padding(end = 16.dp),
-                        style = MaterialTheme.typography.labelMedium
-                    )
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = DailySyncBrand.Teal.copy(alpha = 0.12f),
+                        modifier = Modifier.padding(end = 16.dp)
+                    ) {
+                        Text(
+                            text = "${visibles.size} registros",
+                            fontFamily = DailySyncBrand.Font,
+                            color = DailySyncBrand.Teal,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
                 }
             )
         }
     ) { innerPadding ->
-
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item {
                 Surface(
                     shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor =
-                        MaterialTheme.colorScheme.onSecondaryContainer
+                    color = DailySyncBrand.Field,
+                    border = BorderStroke(1.dp, DailySyncBrand.Border)
                 ) {
                     Text(
-                        text = "Tus registros están almacenados " +
-                                "en este dispositivo.",
+                        text = "🔒 Tus registros están almacenados de forma segura en este dispositivo.",
+                        fontFamily = DailySyncBrand.Font,
+                        fontSize = 13.sp,
+                        color = DailySyncBrand.Ink,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp)
+                            .padding(14.dp)
                     )
                 }
             }
@@ -98,19 +124,58 @@ fun HistorialScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     item {
+                        val sel = state.filtroSeleccionado == null
                         FilterChip(
-                            selected = state.filtroSeleccionado == null,
+                            selected = sel,
                             onClick = { onSeleccionarFiltro(null) },
-                            label = { Text("Todos") }
+                            label = {
+                                Text(
+                                    "Todos",
+                                    fontFamily = DailySyncBrand.Font,
+                                    fontWeight = if (sel) FontWeight.Bold else FontWeight.Medium
+                                )
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = DailySyncBrand.Teal,
+                                selectedLabelColor = Color.White,
+                                containerColor = DailySyncBrand.Field,
+                                labelColor = DailySyncBrand.Ink
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = sel,
+                                borderColor = DailySyncBrand.Border,
+                                selectedBorderColor = DailySyncBrand.Teal
+                            )
                         )
                     }
 
                     items(AmbitoRegistro.entries.toList()) { ambito ->
+                        val sel = state.filtroSeleccionado == ambito
                         FilterChip(
-                            selected =
-                                state.filtroSeleccionado == ambito,
+                            selected = sel,
                             onClick = { onSeleccionarFiltro(ambito) },
-                            label = { Text(ambito.titulo) }
+                            label = {
+                                Text(
+                                    ambito.titulo,
+                                    fontFamily = DailySyncBrand.Font,
+                                    fontWeight = if (sel) FontWeight.Bold else FontWeight.Medium
+                                )
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = DailySyncBrand.Teal,
+                                selectedLabelColor = Color.White,
+                                containerColor = DailySyncBrand.Field,
+                                labelColor = DailySyncBrand.Ink
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = sel,
+                                borderColor = DailySyncBrand.Border,
+                                selectedBorderColor = DailySyncBrand.Teal
+                            )
                         )
                     }
                 }
@@ -120,7 +185,9 @@ fun HistorialScreen(
                 item {
                     Text(
                         text = mensaje,
-                        color = MaterialTheme.colorScheme.primary
+                        fontFamily = DailySyncBrand.Font,
+                        color = DailySyncBrand.Teal,
+                        fontSize = 13.sp
                     )
                 }
             }
@@ -130,13 +197,14 @@ fun HistorialScreen(
                     Column {
                         Text(
                             text = error,
-                            color = MaterialTheme.colorScheme.error
+                            fontFamily = DailySyncBrand.Font,
+                            color = DailySyncBrand.Error
                         )
                         TextButton(
                             onClick = onReintentar,
                             enabled = !state.eliminando
                         ) {
-                            Text("Reintentar")
+                            Text("Reintentar", fontFamily = DailySyncBrand.Font, color = DailySyncBrand.Teal)
                         }
                     }
                 }
@@ -144,11 +212,9 @@ fun HistorialScreen(
 
             if (state.cargando) {
                 item {
-                    CircularProgressIndicator(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .wrapContentWidth()
-                    )
+                    Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = DailySyncBrand.Teal)
+                    }
                 }
             } else if (visibles.isEmpty() && state.error == null) {
                 item {
@@ -158,6 +224,8 @@ fun HistorialScreen(
                         } else {
                             "No hay registros de este ámbito."
                         },
+                        fontFamily = DailySyncBrand.Font,
+                        color = DailySyncBrand.Muted,
                         modifier = Modifier.padding(vertical = 24.dp)
                     )
                 }
@@ -167,7 +235,7 @@ fun HistorialScreen(
                 items = visibles,
                 key = { "${it.ambito.name}:${it.id}" }
             ) { registro ->
-                TarjetaHistorial(
+                TarjetaHistorialBrand(
                     registro = registro,
                     habilitada = !state.eliminando,
                     onVerDetalle = { onVerDetalle(registro) },
@@ -181,11 +249,20 @@ fun HistorialScreen(
     state.registroAEliminar?.let { registro ->
         AlertDialog(
             onDismissRequest = onCancelarEliminar,
-            title = { Text("Eliminar registro") },
+            containerColor = DailySyncBrand.Field,
+            title = {
+                Text(
+                    text = "Eliminar registro",
+                    fontFamily = DailySyncBrand.Font,
+                    fontWeight = FontWeight.Bold,
+                    color = DailySyncBrand.Ink
+                )
+            },
             text = {
                 Text(
-                    "Se eliminará «${registro.titulo}» del dispositivo. " +
-                            "Esta acción no se puede deshacer."
+                    text = "Se eliminará «${registro.titulo}» del dispositivo. Esta acción no se puede deshacer.",
+                    fontFamily = DailySyncBrand.Font,
+                    color = DailySyncBrand.Ink
                 )
             },
             confirmButton = {
@@ -194,12 +271,10 @@ fun HistorialScreen(
                     enabled = !state.eliminando
                 ) {
                     Text(
-                        text = if (state.eliminando) {
-                            "Eliminando…"
-                        } else {
-                            "Eliminar"
-                        },
-                        color = MaterialTheme.colorScheme.error
+                        text = if (state.eliminando) "Eliminando…" else "Eliminar",
+                        fontFamily = DailySyncBrand.Font,
+                        color = DailySyncBrand.Error,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             },
@@ -208,7 +283,7 @@ fun HistorialScreen(
                     onClick = onCancelarEliminar,
                     enabled = !state.eliminando
                 ) {
-                    Text("Cancelar")
+                    Text("Cancelar", fontFamily = DailySyncBrand.Font, color = DailySyncBrand.Muted)
                 }
             }
         )
@@ -216,87 +291,116 @@ fun HistorialScreen(
 }
 
 @Composable
-private fun TarjetaHistorial(
+private fun TarjetaHistorialBrand(
     registro: RegistroHistorial,
     habilitada: Boolean,
     onVerDetalle: () -> Unit,
     onEditar: () -> Unit,
     onEliminar: () -> Unit
 ) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp)
+    val (colorAcento, colorFondoBadge, icono) = when (registro.ambito) {
+        AmbitoRegistro.ANIMO -> Triple(Color(0xFF42765F), Color(0xFFEAF5EE), "😊")
+        AmbitoRegistro.DBT -> Triple(Color(0xFF785B99), Color(0xFFF2ECF8), "💬")
+        AmbitoRegistro.NEURODESARROLLO -> Triple(DailySyncBrand.Teal, Color(0xFFE6F7F5), "🧠")
+        AmbitoRegistro.ADICCIONES -> Triple(DailySyncBrand.Error, Color(0xFFFDF0F1), "🛡️")
+    }
+
+    Surface(
+        onClick = onVerDetalle,
+        shape = RoundedCornerShape(20.dp),
+        color = DailySyncBrand.Field,
+        border = BorderStroke(1.dp, DailySyncBrand.Border),
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                text = registro.ambito.titulo,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = colorFondoBadge
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(icono, fontSize = 14.sp)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = registro.ambito.titulo,
+                            fontFamily = DailySyncBrand.Font,
+                            color = colorAcento,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
 
-            Text(
-                text = formatearFechaRegistro(registro.fechaHora),
-                style = MaterialTheme.typography.bodySmall
-            )
+                Text(
+                    text = formatearFechaRegistro(registro.fechaHora),
+                    fontFamily = DailySyncBrand.Font,
+                    fontSize = 12.sp,
+                    color = DailySyncBrand.Muted
+                )
+            }
 
             Text(
                 text = registro.titulo,
+                fontFamily = DailySyncBrand.Font,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = DailySyncBrand.Ink
             )
 
-            Text(registro.descripcion)
+            Text(
+                text = registro.descripcion,
+                fontFamily = DailySyncBrand.Font,
+                fontSize = 14.sp,
+                color = DailySyncBrand.Ink.copy(alpha = 0.85f)
+            )
 
             Text(
                 text = "Intensidad: ${registro.intensidad}",
-                style = MaterialTheme.typography.bodySmall
+                fontFamily = DailySyncBrand.Font,
+                fontSize = 12.sp,
+                color = DailySyncBrand.Muted
             )
 
             Text(
-                text = if (registro.pendienteSync) {
-                    "Guardado localmente · Pendiente de sincronización"
-                } else {
-                    "Sincronizado"
-                },
-                style = MaterialTheme.typography.bodySmall
+                text = if (registro.pendienteSync) "Guardado localmente · Pendiente de sincronización" else "Sincronizado",
+                fontFamily = DailySyncBrand.Font,
+                fontSize = 11.sp,
+                color = DailySyncBrand.Muted.copy(alpha = 0.7f)
             )
 
-            TextButton(
-                onClick = onVerDetalle,
-                enabled = habilitada
-            ) {
-                Text("Ver detalle")
-            }
-
-            HorizontalDivider()
+            HorizontalDivider(color = DailySyncBrand.Border)
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(
-                    onClick = onEditar,
-                    enabled = habilitada &&
-                            registro.ambito in setOf(
-                        AmbitoRegistro.ANIMO,
-                        AmbitoRegistro.DBT,
-                        AmbitoRegistro.NEURODESARROLLO,
-                        AmbitoRegistro.ADICCIONES
-                    )
-                ) {
-                    Text("Editar")
-                }
-                TextButton(
-                    onClick = onEliminar,
+                    onClick = onVerDetalle,
                     enabled = habilitada
                 ) {
-                    Text(
-                        text = "Eliminar",
-                        color = MaterialTheme.colorScheme.error
-                    )
+                    Text("Ver detalle →", fontFamily = DailySyncBrand.Font, color = DailySyncBrand.Teal, fontWeight = FontWeight.Bold)
+                }
+
+                Row {
+                    if (registro.ambito in setOf(AmbitoRegistro.ANIMO, AmbitoRegistro.DBT, AmbitoRegistro.NEURODESARROLLO, AmbitoRegistro.ADICCIONES)) {
+                        TextButton(onClick = onEditar, enabled = habilitada) {
+                            Text("Editar", fontFamily = DailySyncBrand.Font, color = DailySyncBrand.Teal)
+                        }
+                    }
+                    TextButton(onClick = onEliminar, enabled = habilitada) {
+                        Text("Eliminar", fontFamily = DailySyncBrand.Font, color = DailySyncBrand.Error)
+                    }
                 }
             }
         }
