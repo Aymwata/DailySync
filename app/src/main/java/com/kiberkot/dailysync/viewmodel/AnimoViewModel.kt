@@ -8,12 +8,15 @@ import com.kiberkot.dailysync.data.local.entities.RegistroAnimoEntity
 import com.kiberkot.dailysync.model.CategoriaAnimo
 import com.kiberkot.dailysync.model.RegistroAnimo
 import com.kiberkot.dailysync.utils.NotificationHelper
+import com.kiberkot.dailysync.data.local.dao.DailySyncDao
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -41,221 +44,113 @@ data class AnimoUiState(
     val bannerExitoVisible: Boolean = false,
     val idRegistroExistente: String? = null,
     val editando: Boolean = false,
-    val fechaHoraOriginal: String = ""
+    val fechaHoraOriginal: String = "",
+    val cargando: Boolean = true,
+    val guardando: Boolean = false,
+    val error: String? = null,
+    val cargaFallida: Boolean = false,
+    val noDisponible: Boolean = false
 )
 
-class AnimoViewModel(application: Application) : AndroidViewModel(application) {
-
-    private val dao = AppDatabase.getDatabase(application).dailySyncDao()
+class AnimoViewModel @JvmOverloads constructor(
+    application: Application,
+    private val dao: DailySyncDao = AppDatabase.getDatabase(application).dailySyncDao()
+) : AndroidViewModel(application) {
     private val notificationHelper = NotificationHelper(application)
-
     private val _uiState = MutableStateFlow(AnimoUiState())
     val uiState: StateFlow<AnimoUiState> = _uiState.asStateFlow()
+    private var cargaJob: Job? = null
+    private var claveCarga: Pair<String, String?>? = null
 
-    init {
-        viewModelScope.launch {
-            combine(
-                dao.obtenerCatalogoAnimo(),
-                dao.observarAnimoPorUsuario(AppDatabase.USUARIO_DEMO)
-            ) { catalogoEntities, registroEntities ->
-                val categoriasActuales = if (catalogoEntities.isNotEmpty()) {
-                    catalogoEntities.map { entity ->
-                        CategoriaAnimo(id = entity.idCategoria, nombre = entity.nombreCategoria)
+    fun cargar(usuarioId: String, registroId: String? = null) {
+        val clave = usuarioId to registroId
+        if (_uiState.value.guardando || (claveCarga == clave && cargaJob?.isActive == true && !_uiState.value.cargaFallida && !_uiState.value.noDisponible)) return
+        cargaJob?.cancel()
+        claveCarga = clave
+        _uiState.value = AnimoUiState(editando = registroId != null)
+        cargaJob = viewModelScope.launch {
+            try {
+                check(dao.obtenerUsuario(usuarioId) != null)
+                var inicializado = false
+                val registro = registroId?.let { dao.observarRegistroAnimo(it, usuarioId) } ?: flowOf(null)
+                combine(dao.obtenerCatalogoAnimo(), registro) { categorias, entidad ->
+                    categorias.map { CategoriaAnimo(it.idCategoria, it.nombreCategoria) } to entidad
+                }.collect { (categorias, entidad) ->
+                    val modelo = entidad?.let {
+                        RegistroAnimo(it.idRegistro, it.idUsuario, it.idCategoria,
+                            categorias.find { c -> c.id == it.idCategoria }?.nombre ?: "Estado de ánimo",
+                            it.fechaHora, it.nivelIntensidad, it.contexto, it.notaOpcional, it.pendienteSync)
                     }
-                } else {
-                    CATALOGO_ANIMO_DEFAULT
+                    _uiState.update { actual ->
+                        val base = if (!inicializado && entidad != null) actual.copy(
+                            idRegistroExistente = entidad.idRegistro,
+                            categoriaSeleccionada = categorias.find { it.id == entidad.idCategoria },
+                            nivelIntensidad = entidad.nivelIntensidad.toFloat(), contexto = entidad.contexto,
+                            notaOpcional = entidad.notaOpcional.orEmpty(), fechaHoraOriginal = entidad.fechaHora
+                        ) else actual
+                        base.copy(categorias = categorias, historial = listOfNotNull(modelo), cargando = false,
+                            noDisponible = registroId != null && entidad == null, cargaFallida = false,
+                            error = if (registroId != null && entidad == null) "No se encontró el registro solicitado." else actual.error)
+                    }
+                    inicializado = true
                 }
-
-                val catalogoMap = categoriasActuales.associateBy { it.id }
-
-                val registrosMapeados = registroEntities.map { entity ->
-                    RegistroAnimo(
-                        id = entity.idRegistro,
-                        usuarioId = entity.idUsuario,
-                        categoriaId = entity.idCategoria,
-                        categoriaNombre = catalogoMap[entity.idCategoria]?.nombre
-                            ?: "Ánimo #${entity.idCategoria}",
-                        fechaHora = entity.fechaHora,
-                        nivelIntensidad = entity.nivelIntensidad,
-                        contexto = entity.contexto,
-                        notaOpcional = entity.notaOpcional,
-                        pendienteSync = entity.pendienteSync
-                    )
-                }
-
-                Pair(categoriasActuales, registrosMapeados)
-            }.collect { (categorias, registros) ->
-                _uiState.update { currentState ->
-                    currentState.copy(
-                        categorias = categorias,
-                        historial = registros
-                    )
-                }
+            } catch (e: CancellationException) { throw e
+            } catch (e: Exception) {
+                _uiState.update { it.copy(cargando = false, cargaFallida = true,
+                    error = "No se pudieron cargar los datos. Intenta nuevamente.") }
             }
         }
     }
 
-    fun cargarParaEditar(registroId: String) {
-        viewModelScope.launch {
-            val registroLocal = _uiState.value.historial.find { it.id == registroId }
-            if (registroLocal != null) {
-                val cat = _uiState.value.categorias.find { it.id == registroLocal.categoriaId }
-                    ?: CategoriaAnimo(registroLocal.categoriaId, registroLocal.categoriaNombre)
-
-                _uiState.update {
-                    it.copy(
-                        idRegistroExistente = registroLocal.id,
-                        editando = true,
-                        categoriaSeleccionada = cat,
-                        nivelIntensidad = registroLocal.nivelIntensidad.toFloat(),
-                        contexto = registroLocal.contexto,
-                        notaOpcional = registroLocal.notaOpcional ?: "",
-                        fechaHoraOriginal = registroLocal.fechaHora,
-                        errorCategoria = null,
-                        errorContexto = null
-                    )
-                }
-            } else {
-                val entities = dao.observarAnimoPorUsuario(AppDatabase.USUARIO_DEMO).firstOrNull() ?: emptyList()
-                val entity = entities.find { it.idRegistro == registroId }
-                if (entity != null) {
-                    val catEntities = dao.obtenerCatalogoAnimo().firstOrNull() ?: emptyList()
-                    val catName = catEntities.find { it.idCategoria == entity.idCategoria }?.nombreCategoria ?: "Ánimo"
-                    val cat = CategoriaAnimo(entity.idCategoria, catName)
-
-                    _uiState.update {
-                        it.copy(
-                            idRegistroExistente = entity.idRegistro,
-                            editando = true,
-                            categoriaSeleccionada = cat,
-                            nivelIntensidad = entity.nivelIntensidad.toFloat(),
-                            contexto = entity.contexto,
-                            notaOpcional = entity.notaOpcional ?: "",
-                            fechaHoraOriginal = entity.fechaHora,
-                            errorCategoria = null,
-                            errorContexto = null
-                        )
-                    }
-                }
-            }
-        }
+    private fun cambiar(transformar: (AnimoUiState) -> AnimoUiState) {
+        if (_uiState.value.guardando || _uiState.value.cargando || _uiState.value.noDisponible || _uiState.value.cargaFallida) return
+        _uiState.update(transformar)
     }
-
-    fun seleccionarCategoria(categoria: CategoriaAnimo) {
-        _uiState.update {
-            it.copy(
-                categoriaSeleccionada = categoria,
-                errorCategoria = null,
-                bannerExitoVisible = false
-            )
-        }
-    }
-
-    fun cambiarIntensidad(intensidad: Float) {
-        _uiState.update {
-            it.copy(
-                nivelIntensidad = intensidad,
-                bannerExitoVisible = false
-            )
-        }
-    }
-
-    fun cambiarContexto(contexto: String) {
-        _uiState.update {
-            it.copy(
-                contexto = contexto,
-                errorContexto = if (contexto.trim().length in 3..60) null else it.errorContexto,
-                bannerExitoVisible = false
-            )
-        }
-    }
-
-    fun cambiarNota(nota: String) {
-        _uiState.update {
-            it.copy(
-                notaOpcional = nota,
-                bannerExitoVisible = false
-            )
-        }
-    }
+    fun seleccionarCategoria(categoria: CategoriaAnimo) = cambiar { it.copy(categoriaSeleccionada = categoria, errorCategoria = null) }
+    fun cambiarIntensidad(valor: Float) = cambiar { it.copy(nivelIntensidad = valor) }
+    fun cambiarContexto(valor: String) = cambiar { it.copy(contexto = valor, errorContexto = null) }
+    fun cambiarNota(valor: String) = cambiar { it.copy(notaOpcional = valor) }
 
     fun guardarRegistro(onExito: () -> Unit): Boolean {
-        val currentState = _uiState.value
-
-        val errCategoria = if (currentState.categoriaSeleccionada == null) {
+        val actual = _uiState.value
+        val clave = claveCarga ?: return false
+        if (actual.cargando || actual.guardando || actual.noDisponible || actual.cargaFallida) return false
+        val errorCategoria = if (actual.categoriaSeleccionada?.id !in actual.categorias.map { it.id }) {
             "Debes seleccionar una categoría de estado de ánimo."
         } else null
-
-        val contextoLimpio = currentState.contexto.trim()
-        val errContexto = when {
-            contextoLimpio.isBlank() -> "El contexto o entorno es obligatorio."
-            contextoLimpio.length < 3 -> "Usa al menos 3 caracteres para describir el contexto."
-            contextoLimpio.length > 60 -> "Usa máximo 60 caracteres para el contexto."
-            else -> null
-        }
-
-        if (errCategoria != null || errContexto != null) {
-            _uiState.update {
-                it.copy(
-                    errorCategoria = errCategoria,
-                    errorContexto = errContexto,
-                    bannerExitoVisible = false
-                )
-            }
+        val contexto = actual.contexto.trim()
+        val errorContexto = if (contexto.length !in 3..60) "Escribe entre 3 y 60 caracteres para el contexto." else null
+        _uiState.update { it.copy(errorCategoria = errorCategoria, errorContexto = errorContexto, error = null) }
+        if (errorCategoria != null || errorContexto != null) return false
+        if (!actual.nivelIntensidad.isFinite() || actual.nivelIntensidad !in 1f..5f) {
+            _uiState.update { it.copy(error = "La intensidad debe estar entre 1 y 5.") }
             return false
         }
-
-        val categoriaElegida = currentState.categoriaSeleccionada!!
-        val timestampActual = currentState.fechaHoraOriginal.ifEmpty {
-            SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
-        }
-        val idFinal = currentState.idRegistroExistente ?: UUID.randomUUID().toString()
-
-        val entidad = RegistroAnimoEntity(
-            idRegistro = idFinal,
-            idUsuario = AppDatabase.USUARIO_DEMO,
-            idCategoria = categoriaElegida.id,
-            fechaHora = timestampActual,
-            nivelIntensidad = currentState.nivelIntensidad.toInt(),
-            contexto = contextoLimpio,
-            notaOpcional = currentState.notaOpcional.trim().ifBlank { null },
-            pendienteSync = true
-        )
-
+        // Bloquear antes de iniciar la escritura evita que dos pulsaciones creen dos registros.
+        _uiState.update { it.copy(guardando = true) }
         viewModelScope.launch {
-            if (currentState.editando) {
-                dao.actualizarRegistroAnimo(entidad)
-            } else {
-                dao.insertarRegistroAnimo(entidad)
+            try {
+                val categoria = requireNotNull(actual.categoriaSeleccionada)
+                check(dao.obtenerUsuario(clave.first) != null)
+                if (clave.second != null) {
+                    check(dao.actualizarAnimoDelUsuario(clave.second!!, clave.first, categoria.id,
+                        contexto, actual.notaOpcional.trim().ifBlank { null }, actual.nivelIntensidad.toInt()) == 1)
+                } else {
+                    dao.insertarRegistroAnimo(RegistroAnimoEntity(UUID.randomUUID().toString(), clave.first,
+                        categoria.id, SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.ROOT).format(Date()),
+                        actual.nivelIntensidad.toInt(), contexto, actual.notaOpcional.trim().ifBlank { null }))
+                }
+            } catch (e: CancellationException) { throw e
+            } catch (e: Exception) {
+                _uiState.update { it.copy(guardando = false, error = "No se pudo guardar el registro. Intenta nuevamente.") }
+                return@launch
             }
-
-            notificationHelper.mostrarNotificacionCheckIn(
-                titulo = "DailySync",
-                mensaje = if (currentState.editando) "Check-in actualizado." else "Nuevo check-in guardado localmente."
-            )
-
+            notificationHelper.mostrarNotificacionCheckIn("DailySync",
+                if (actual.editando) "Check-in actualizado." else "Nuevo check-in guardado localmente.")
             _uiState.update { it.copy(bannerExitoVisible = true) }
             delay(1000L)
-
-            _uiState.update {
-                it.copy(
-                    categoriaSeleccionada = null,
-                    nivelIntensidad = 3f,
-                    contexto = "",
-                    notaOpcional = "",
-                    errorCategoria = null,
-                    errorContexto = null,
-                    bannerExitoVisible = false,
-                    idRegistroExistente = null,
-                    editando = false,
-                    fechaHoraOriginal = ""
-                )
-            }
-
             onExito()
         }
-
         return true
     }
-
 }

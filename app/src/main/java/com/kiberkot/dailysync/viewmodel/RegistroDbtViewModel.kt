@@ -44,7 +44,7 @@ class RegistroDbtViewModel @JvmOverloads constructor(
 
     fun cargar(usuarioId: String, registroId: String? = null, habilidadId: Int? = null) {
         val clave = Triple(usuarioId, registroId, habilidadId)
-        if (_uiState.value.procesando || (claveCarga == clave && observacion?.isActive == true)) return
+        if (_uiState.value.procesando || (claveCarga == clave && observacion?.isActive == true && _uiState.value.error == null)) return
         claveCarga = clave
         observacion?.cancel()
         _uiState.value = RegistroDbtUiState()
@@ -67,7 +67,7 @@ class RegistroDbtViewModel @JvmOverloads constructor(
                                 it.utilidadPercibida, it.pendienteSync)
                         }
                         _uiState.update { actual ->
-                            val formulario = if (formularioInicializado) actual.formulario else {
+                            val formulario = if (registroId != null && registro == null) FormularioDbt() else if (formularioInicializado) actual.formulario else {
                                 registro?.let { FormularioDbt(it.habilidadId, it.situacion, it.intensidad, it.utilidad) }
                                     ?: FormularioDbt(habilidadId = habilidadId)
                             }
@@ -104,7 +104,7 @@ class RegistroDbtViewModel @JvmOverloads constructor(
     }
 
     private fun cambiar(transformar: (FormularioDbt) -> FormularioDbt) {
-        if (_uiState.value.procesando) return
+        if (_uiState.value.procesando || _uiState.value.cargando || (claveCarga?.second != null && _uiState.value.registro == null)) return
         _uiState.update {
             val formulario = transformar(it.formulario)
             val errores = if (it.errores.isEmpty()) emptyMap() else {
@@ -123,6 +123,10 @@ class RegistroDbtViewModel @JvmOverloads constructor(
         val clave = claveCarga ?: return
         val actual = _uiState.value
         if (actual.cargando || actual.procesando) return
+        if (clave.second != null && actual.registro == null) {
+            _uiState.update { it.copy(error = "No se encontró el registro solicitado.") }
+            return
+        }
         val errores = validarFormulario(actual.formulario, actual.catalogo.map { it.id }.toSet())
         _uiState.update { it.copy(errores = errores, error = null) }
         if (errores.isNotEmpty()) return

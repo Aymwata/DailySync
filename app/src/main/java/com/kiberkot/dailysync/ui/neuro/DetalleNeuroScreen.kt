@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
+import com.kiberkot.dailysync.ui.components.EstadoRegistro
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,7 +28,8 @@ fun DetalleNeuroScreen(
     state: NeuroUiState,
     onEditar: () -> Unit,
     onVolver: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onReintentar: () -> Unit = {}
 ) {
     val estrategiaNombre = state.catalogoEstrategias.find {
         it.idEstrategia == state.idEstrategiaSeleccionada
@@ -44,13 +46,17 @@ fun DetalleNeuroScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onEditar) {
+                    IconButton(onClick = onEditar, enabled = !state.isLoading && !(state.cargaFallida || state.noDisponible)) {
                         Icon(Icons.Default.Edit, contentDescription = "Editar")
                     }
                 }
             )
         }
     ) { paddingValues ->
+        if (state.isLoading || state.cargaFallida || state.noDisponible) {
+            EstadoRegistro(state.isLoading, state.errorMsg, onReintentar, Modifier.padding(paddingValues))
+            return@Scaffold
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()

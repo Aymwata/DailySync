@@ -11,6 +11,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
+import androidx.activity.compose.BackHandler
+import com.kiberkot.dailysync.ui.components.EstadoRegistro
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,8 +35,10 @@ fun AdiccionScreen(
     onCambioEstadoObjetivo: (String) -> Unit,
     onGuardar: () -> Unit,
     onVolver: () -> Unit,
+    onReintentar: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    BackHandler(enabled = state.guardando || state.guardadoExitoso) { }
     val opcionesObjetivo = listOf("Logrado", "En proceso", "Resistido")
 
     Scaffold(
@@ -43,13 +47,17 @@ fun AdiccionScreen(
             TopAppBar(
                 title = { Text(if (editando) "Editar Craving" else "Adicciones y Craving", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onVolver) {
+                    IconButton(onClick = onVolver, enabled = !(state.guardando || state.guardadoExitoso)) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                     }
                 }
             )
         }
     ) { paddingValues ->
+        if (state.isLoading || state.cargaFallida || state.noDisponible) {
+            EstadoRegistro(state.isLoading, state.errorMsg, onReintentar, Modifier.padding(paddingValues))
+            return@Scaffold
+        }
         Column(
             modifier = modifier
                 .fillMaxSize()
@@ -80,6 +88,7 @@ fun AdiccionScreen(
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text("Nivel de Impulso / Craving: ${state.nivelImpulso} / 10", fontWeight = FontWeight.SemiBold)
                     Slider(
+                        enabled = !state.guardando && !state.guardadoExitoso,
                         value = state.nivelImpulso.toFloat(),
                         onValueChange = { onCambioImpulso(it.toInt()) },
                         valueRange = 1f..10f,
@@ -91,6 +100,7 @@ fun AdiccionScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
+                enabled = !state.guardando && !state.guardadoExitoso,
                 value = state.desencadenante,
                 onValueChange = onCambioDesencadenante,
                 label = { Text("Desencadenante / Gatillo") },
@@ -109,6 +119,7 @@ fun AdiccionScreen(
             ) {
                 state.catalogoAcciones.forEach { acc ->
                     FilterChip(
+                        enabled = !state.guardando && !state.guardadoExitoso,
                         selected = state.idAccionSeleccionada == acc.idAccionProtectora,
                         onClick = { onSeleccionarAccion(acc.idAccionProtectora) },
                         label = { Text(acc.nombreAccion) }
@@ -123,6 +134,7 @@ fun AdiccionScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 opcionesObjetivo.forEach { obj ->
                     FilterChip(
+                        enabled = !state.guardando && !state.guardadoExitoso,
                         selected = state.estadoObjetivo == obj,
                         onClick = { onCambioEstadoObjetivo(obj) },
                         label = { Text(obj) }
@@ -143,11 +155,11 @@ fun AdiccionScreen(
 
             Button(
                 onClick = onGuardar,
-                enabled = !state.isLoading && !state.guardadoExitoso,
+                enabled = !state.isLoading && !state.guardando && !state.guardadoExitoso,
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth().height(52.dp)
             ) {
-                if (state.isLoading) CircularProgressIndicator(color = Color.White)
+                if (state.guardando) CircularProgressIndicator(color = Color.White)
                 else Text(if (editando) "Guardar Cambios" else "Guardar Registro", fontWeight = FontWeight.Bold)
             }
         }

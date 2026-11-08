@@ -2,4 +2,12 @@
 <resources>
 
     <style name="Theme.DailySync" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.DailySync.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#F0FBF8</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.DailySync</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">#F0FBF8</item>
+        <item name="android:navigationBarColor">#F0FBF8</item>
+    </style>
 </resources>

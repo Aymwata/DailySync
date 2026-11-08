@@ -1,21 +1,22 @@
 package com.kiberkot.dailysync.navigation
 
 import kotlinx.coroutines.delay
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 
 import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.kiberkot.dailysync.data.local.AppDatabase
 import com.kiberkot.dailysync.model.AmbitoRegistro
 import com.kiberkot.dailysync.ui.adiccion.AdiccionScreen
 import com.kiberkot.dailysync.ui.adiccion.DetalleAdiccionScreen
@@ -26,6 +27,7 @@ import com.kiberkot.dailysync.ui.dbt.RegistroDbtScreen
 import com.kiberkot.dailysync.ui.historial.HistorialScreen
 import com.kiberkot.dailysync.ui.home.HomeScreen
 import com.kiberkot.dailysync.ui.login.LoginScreen
+import com.kiberkot.dailysync.ui.login.InicioSesionScreen
 import com.kiberkot.dailysync.ui.login.RegisterScreen
 import com.kiberkot.dailysync.ui.neuro.DetalleNeuroScreen
 import com.kiberkot.dailysync.ui.neuro.NeuroScreen
@@ -69,107 +71,88 @@ object Destinos {
 }
 
 @Composable
-fun AppNavigation(
-    navController: NavHostController = rememberNavController(),
-    animoViewModel: AnimoViewModel = viewModel(),
-    loginViewModel: LoginViewModel = viewModel(),
-    registerViewModel: RegisterViewModel = viewModel(),
-    homeViewModel: HomeViewModel = viewModel(),
-    dbtViewModel: DbtViewModel = viewModel(),
-    neuroViewModel: NeuroViewModel = viewModel(),
-    adiccionViewModel: AdiccionViewModel = viewModel()
-) {
-    val animoUiState by animoViewModel.uiState.collectAsState()
+fun AppNavigation(loginViewModel: LoginViewModel = viewModel()) {
     val loginUiState by loginViewModel.uiState.collectAsState()
-    val registerUiState by registerViewModel.uiState.collectAsState()
-    val homeUiState by homeViewModel.uiState.collectAsState()
-    val neuroUiState by neuroViewModel.uiState.collectAsState()
-    val adiccionUiState by adiccionViewModel.uiState.collectAsState()
-
+    if (loginUiState.restaurandoSesion || loginUiState.errorSesion != null) {
+        InicioSesionScreen(loginUiState.errorSesion, loginViewModel::restaurarSesion)
+        return
+    }
     val context = LocalContext.current
-    val usuarioDbtId = AppDatabase.USUARIO_DEMO
-
-    LaunchedEffect(loginUiState.loginExitoso) {
-        if (loginUiState.loginExitoso) {
-            navController.navigate(Destinos.HOME) {
-                popUpTo(Destinos.LOGIN) { inclusive = true }
+    LaunchedEffect(loginUiState.error, loginUiState.usuarioId) {
+        if (loginUiState.usuarioId != null && loginUiState.error != null) {
+            Toast.makeText(context, loginUiState.error, Toast.LENGTH_LONG).show()
+        }
+    }
+    val usuarioId = loginUiState.usuarioId
+    if (usuarioId == null) {
+        val navController = rememberNavController()
+        NavHost(navController, startDestination = Destinos.LOGIN,
+            enterTransition = { entradaRapida() }, exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None }, popExitTransition = { ExitTransition.None }) {
+            composable(Destinos.LOGIN) { entrada ->
+                LoginScreen(state = loginUiState,
+                    onCambioUsuario = loginViewModel::cambiarUsuario,
+                    onCambioPassword = loginViewModel::cambiarPassword,
+                    onTogglePasswordVisibility = loginViewModel::conmutarVisibilidadPassword,
+                    onIniciarSesion = loginViewModel::ejecutarLogin,
+                    onAccesoPrueba = {
+                        loginViewModel.cambiarUsuario(com.kiberkot.dailysync.data.local.AppDatabase.USUARIO_DEMO)
+                        loginViewModel.cambiarPassword("1234")
+                        loginViewModel.ejecutarLogin()
+                    },
+                    onIrARegistro = { navController.navegarDesde(entrada, Destinos.REGISTER) })
             }
-            loginViewModel.resetearEstadoLogin()
+            composable(Destinos.REGISTER) { entrada ->
+                val vm: RegisterViewModel = viewModel()
+                val state by vm.uiState.collectAsState()
+                LaunchedEffect(state.registroExitoso) {
+                    if (state.registroExitoso && navController.currentBackStackEntry == entrada) navController.popBackStack()
+                }
+                RegisterScreen(state = state, onCambioId = vm::cambiarIdUsuario,
+                    onCambioAlias = vm::cambiarAlias, onCambioCorreo = vm::cambiarCorreo,
+                    onCambioPassword = vm::cambiarPassword, onTogglePasswordVisibility = vm::conmutarVisibilidadPassword,
+                    onRegistrar = vm::registrarUsuario, onVolverLogin = { navController.volverDesde(entrada) })
+            }
         }
+    } else {
+        // Las rutas privadas solo se componen mientras existe una cuenta autenticada.
+        key(usuarioId) { NavegacionSesion(usuarioId, loginViewModel::cerrarSesion) }
     }
+}
 
-    LaunchedEffect(registerUiState.registroExitoso) {
-        if (registerUiState.registroExitoso) {
-            navController.popBackStack()
-            registerViewModel.resetearEstado()
-        }
-    }
-
-    LaunchedEffect(neuroUiState.guardadoExitoso) {
-        if (neuroUiState.guardadoExitoso) {
-            val entrada = navController.currentBackStackEntry
-            delay(1000L)
-            if (navController.currentBackStackEntry == entrada) navController.popBackStack()
-            neuroViewModel.resetearEstado()
-        }
-    }
-
-    LaunchedEffect(adiccionUiState.guardadoExitoso) {
-        if (adiccionUiState.guardadoExitoso) {
-            val entrada = navController.currentBackStackEntry
-            delay(1000L)
-            if (navController.currentBackStackEntry == entrada) navController.popBackStack()
-            adiccionViewModel.resetearEstado()
-        }
-    }
-
-    NavHost(
-        navController = navController,
-        startDestination = Destinos.LOGIN
-    ) {
-        composable(route = Destinos.LOGIN) {
-            LoginScreen(
-                state = loginUiState,
-                onCambioUsuario = loginViewModel::cambiarUsuario,
-                onCambioPassword = loginViewModel::cambiarPassword,
-                onTogglePasswordVisibility = loginViewModel::conmutarVisibilidadPassword,
-                onIniciarSesion = { loginViewModel.ejecutarLogin() },
-                onIrARegistro = { navController.navigate(Destinos.REGISTER) }
-            )
-        }
-
-        composable(route = Destinos.REGISTER) {
-            RegisterScreen(
-                state = registerUiState,
-                onCambioId = registerViewModel::cambiarIdUsuario,
-                onCambioAlias = registerViewModel::cambiarAlias,
-                onCambioCorreo = registerViewModel::cambiarCorreo,
-                onCambioPassword = registerViewModel::cambiarPassword,
-                onTogglePasswordVisibility = registerViewModel::conmutarVisibilidadPassword,
-                onRegistrar = { registerViewModel.registrarUsuario() },
-                onVolverLogin = { navController.popBackStack() }
-            )
-        }
-
-        composable(route = Destinos.HOME) {
-            LaunchedEffect(usuarioDbtId) {
-                homeViewModel.cargar(usuarioDbtId)
+@Composable
+private fun NavegacionSesion(usuarioId: String, onCerrarSesion: () -> Unit) {
+    val navController = rememberNavController()
+    val context = LocalContext.current
+    NavHost(navController = navController, startDestination = Destinos.HOME,
+        enterTransition = { entradaRapida() }, exitTransition = { ExitTransition.None },
+        // Regreso inmediato: una pantalla que sale no debe tapar los toques del Home.
+        popEnterTransition = { EnterTransition.None }, popExitTransition = { ExitTransition.None }) {
+        composable(route = Destinos.HOME) { entrada ->
+            val homeViewModel: HomeViewModel = viewModel()
+            val homeUiState by homeViewModel.uiState.collectAsState()
+            LaunchedEffect(usuarioId) {
+                homeViewModel.cargar(usuarioId)
             }
             HomeScreen(
                 state = homeUiState,
-                onReintentar = { homeViewModel.cargar(usuarioDbtId) },
+                onCerrarSesion = {
+                    navController.popBackStack(navController.graph.id, inclusive = true)
+                    onCerrarSesion()
+                },
+                onReintentar = { homeViewModel.cargar(usuarioId) },
                 onAbrirModulo = { modulo ->
                     when (modulo) {
-                        ModuloHome.ANIMO -> navController.navigate(Destinos.REGISTRO)
-                        ModuloHome.DBT -> navController.navigate(Destinos.DBT_CATALOGO)
-                        ModuloHome.NEURODESARROLLO -> navController.navigate(Destinos.NEURO)
-                        ModuloHome.ADICCIONES -> navController.navigate(Destinos.ADICCION)
+                        ModuloHome.ANIMO -> navController.navegarDesde(entrada, Destinos.REGISTRO)
+                        ModuloHome.DBT -> navController.navegarDesde(entrada, Destinos.DBT_CATALOGO)
+                        ModuloHome.NEURODESARROLLO -> navController.navegarDesde(entrada, Destinos.NEURO)
+                        ModuloHome.ADICCIONES -> navController.navegarDesde(entrada, Destinos.ADICCION)
                     }
                 },
                 onAbrirSeccion = { seccion ->
                     when (seccion) {
                         SeccionHome.INICIO -> Unit
-                        SeccionHome.HISTORIAL -> navController.navigate(Destinos.HISTORIAL)
+                        SeccionHome.HISTORIAL -> navController.navegarDesde(entrada, Destinos.HISTORIAL)
                         SeccionHome.CONTENIDOS,
                         SeccionHome.AJUSTES -> {
                             Toast.makeText(context, "Sección en preparación", Toast.LENGTH_SHORT).show()
@@ -179,53 +162,32 @@ fun AppNavigation(
             )
         }
 
-        composable(route = Destinos.REGISTRO) {
-            RegistroAnimoScreen(
-                state = animoUiState,
-                editando = false,
-                onSeleccionarCategoria = animoViewModel::seleccionarCategoria,
-                onCambioIntensidad = animoViewModel::cambiarIntensidad,
-                onCambioContexto = animoViewModel::cambiarContexto,
-                onCambioNota = animoViewModel::cambiarNota,
-                onGuardar = { animoViewModel.guardarRegistro(onExito = { navController.popBackStack() }) },
-                onVolver = { navController.popBackStack() }
-            )
-        }
-
-        composable(
-            route = Destinos.DETALLE,
-            arguments = listOf(navArgument("registroId") { type = NavType.StringType })
-        ) { entrada ->
-            val id = entrada.arguments?.getString("registroId") ?: ""
-            DetalleAnimoScreen(
-                state = animoUiState,
-                registroId = id,
-                onEditar = { navController.navigate(Destinos.crearRutaEditar(id)) },
-                onVolver = { navController.popBackStack() }
-            )
-        }
-
-        composable(
-            route = Destinos.EDITAR,
-            arguments = listOf(navArgument("registroId") { type = NavType.StringType })
-        ) { entrada ->
-            val id = entrada.arguments?.getString("registroId") ?: ""
-            LaunchedEffect(id) {
-                animoViewModel.cargarParaEditar(id)
+        listOf(Destinos.REGISTRO, Destinos.EDITAR).forEach { ruta ->
+            val editando = ruta == Destinos.EDITAR
+            composable(ruta, arguments = if (editando) listOf(navArgument("registroId") { type = NavType.StringType }) else emptyList()) { entrada ->
+                val vm: AnimoViewModel = viewModel()
+                val state by vm.uiState.collectAsState()
+                val id = entrada.arguments?.getString("registroId")
+                LaunchedEffect(usuarioId, id) { vm.cargar(usuarioId, id) }
+                RegistroAnimoScreen(state = state, editando = editando,
+                    onSeleccionarCategoria = vm::seleccionarCategoria,
+                    onCambioIntensidad = vm::cambiarIntensidad, onCambioContexto = vm::cambiarContexto,
+                    onCambioNota = vm::cambiarNota,
+                    onGuardar = { vm.guardarRegistro {
+                        if (navController.currentBackStackEntry == entrada) navController.popBackStack()
+                    } },
+                    onReintentar = { vm.cargar(usuarioId, id) },
+                    onVolver = { navController.volverDesde(entrada) })
             }
-
-            RegistroAnimoScreen(
-                state = animoUiState,
-                editando = true,
-                onSeleccionarCategoria = animoViewModel::seleccionarCategoria,
-                onCambioIntensidad = animoViewModel::cambiarIntensidad,
-                onCambioContexto = animoViewModel::cambiarContexto,
-                onCambioNota = animoViewModel::cambiarNota,
-                onGuardar = {
-                    animoViewModel.guardarRegistro(onExito = { navController.popBackStack() })
-                },
-                onVolver = { navController.popBackStack() }
-            )
+        }
+        composable(Destinos.DETALLE, arguments = listOf(navArgument("registroId") { type = NavType.StringType })) { entrada ->
+            val vm: AnimoViewModel = viewModel()
+            val state by vm.uiState.collectAsState()
+            val id = entrada.arguments?.getString("registroId").orEmpty()
+            LaunchedEffect(usuarioId, id) { vm.cargar(usuarioId, id) }
+            DetalleAnimoScreen(state = state, registroId = id,
+                onEditar = { navController.navegarDesde(entrada, Destinos.crearRutaEditar(id)) },
+                onReintentar = { vm.cargar(usuarioId, id) }, onVolver = { navController.volverDesde(entrada) })
         }
 
         // --- NEURODESARROLLO (CREAR / EDITAR / DETALLE) ---
@@ -235,9 +197,17 @@ fun AppNavigation(
                 route = ruta,
                 arguments = if (editando) listOf(navArgument("registroId") { type = NavType.StringType }) else emptyList()
             ) { entrada ->
+                val neuroViewModel: NeuroViewModel = viewModel()
+                val neuroUiState by neuroViewModel.uiState.collectAsState()
                 val id = entrada.arguments?.getString("registroId")
-                LaunchedEffect(usuarioDbtId, id) {
-                    neuroViewModel.cargar(usuarioDbtId, id)
+                LaunchedEffect(neuroUiState.guardadoExitoso) {
+                    if (neuroUiState.guardadoExitoso) {
+                        delay(1000L)
+                        if (navController.currentBackStackEntry == entrada) navController.popBackStack()
+                    }
+                }
+                LaunchedEffect(usuarioId, id) {
+                    neuroViewModel.cargar(usuarioId, id)
                 }
 
                 NeuroScreen(
@@ -248,8 +218,9 @@ fun AppNavigation(
                     onSeleccionarEstrategia = neuroViewModel::seleccionarEstrategia,
                     onCambioContexto = neuroViewModel::cambiarContexto,
                     onCambioResultado = neuroViewModel::cambiarResultadoPercibido,
-                    onGuardar = { neuroViewModel.guardarRegistro(usuarioDbtId) },
-                    onVolver = { navController.popBackStack() }
+                    onGuardar = { neuroViewModel.guardarRegistro(usuarioId) },
+                    onReintentar = { neuroViewModel.cargar(usuarioId, id) },
+                    onVolver = { navController.volverDesde(entrada) }
                 )
             }
         }
@@ -258,15 +229,18 @@ fun AppNavigation(
             route = Destinos.NEURO_DETALLE,
             arguments = listOf(navArgument("registroId") { type = NavType.StringType })
         ) { entrada ->
+            val neuroViewModel: NeuroViewModel = viewModel()
+            val neuroUiState by neuroViewModel.uiState.collectAsState()
             val id = entrada.arguments?.getString("registroId") ?: ""
-            LaunchedEffect(usuarioDbtId, id) {
-                neuroViewModel.cargar(usuarioDbtId, id)
+            LaunchedEffect(usuarioId, id) {
+                neuroViewModel.cargar(usuarioId, id, soloLectura = true)
             }
 
             DetalleNeuroScreen(
                 state = neuroUiState,
-                onEditar = { navController.navigate(Destinos.crearRutaEditarNeuro(id)) },
-                onVolver = { navController.popBackStack() }
+                onReintentar = { neuroViewModel.cargar(usuarioId, id, soloLectura = true) },
+                onEditar = { navController.navegarDesde(entrada, Destinos.crearRutaEditarNeuro(id)) },
+                onVolver = { navController.volverDesde(entrada) }
             )
         }
 
@@ -277,9 +251,17 @@ fun AppNavigation(
                 route = ruta,
                 arguments = if (editando) listOf(navArgument("registroId") { type = NavType.StringType }) else emptyList()
             ) { entrada ->
+                val adiccionViewModel: AdiccionViewModel = viewModel()
+                val adiccionUiState by adiccionViewModel.uiState.collectAsState()
                 val id = entrada.arguments?.getString("registroId")
-                LaunchedEffect(usuarioDbtId, id) {
-                    adiccionViewModel.cargar(usuarioDbtId, id)
+                LaunchedEffect(adiccionUiState.guardadoExitoso) {
+                    if (adiccionUiState.guardadoExitoso) {
+                        delay(1000L)
+                        if (navController.currentBackStackEntry == entrada) navController.popBackStack()
+                    }
+                }
+                LaunchedEffect(usuarioId, id) {
+                    adiccionViewModel.cargar(usuarioId, id)
                 }
 
                 AdiccionScreen(
@@ -289,8 +271,9 @@ fun AppNavigation(
                     onCambioDesencadenante = adiccionViewModel::cambiarDesencadenante,
                     onSeleccionarAccion = adiccionViewModel::seleccionarAccion,
                     onCambioEstadoObjetivo = adiccionViewModel::cambiarEstadoObjetivo,
-                    onGuardar = { adiccionViewModel.guardarRegistro(usuarioDbtId) },
-                    onVolver = { navController.popBackStack() }
+                    onGuardar = { adiccionViewModel.guardarRegistro(usuarioId) },
+                    onReintentar = { adiccionViewModel.cargar(usuarioId, id) },
+                    onVolver = { navController.volverDesde(entrada) }
                 )
             }
         }
@@ -299,24 +282,27 @@ fun AppNavigation(
             route = Destinos.ADICCION_DETALLE,
             arguments = listOf(navArgument("registroId") { type = NavType.StringType })
         ) { entrada ->
+            val adiccionViewModel: AdiccionViewModel = viewModel()
+            val adiccionUiState by adiccionViewModel.uiState.collectAsState()
             val id = entrada.arguments?.getString("registroId") ?: ""
-            LaunchedEffect(usuarioDbtId, id) {
-                adiccionViewModel.cargar(usuarioDbtId, id)
+            LaunchedEffect(usuarioId, id) {
+                adiccionViewModel.cargar(usuarioId, id, soloLectura = true)
             }
 
             DetalleAdiccionScreen(
                 state = adiccionUiState,
-                onEditar = { navController.navigate(Destinos.crearRutaEditarAdiccion(id)) },
-                onVolver = { navController.popBackStack() }
+                onReintentar = { adiccionViewModel.cargar(usuarioId, id, soloLectura = true) },
+                onEditar = { navController.navegarDesde(entrada, Destinos.crearRutaEditarAdiccion(id)) },
+                onVolver = { navController.volverDesde(entrada) }
             )
         }
 
-        composable(route = Destinos.HISTORIAL) {
+        composable(route = Destinos.HISTORIAL) { entrada ->
             val historialViewModel: HistorialViewModel = viewModel()
             val historialUiState by historialViewModel.uiState.collectAsState()
 
-            LaunchedEffect(usuarioDbtId) {
-                historialViewModel.cargar(usuarioDbtId)
+            LaunchedEffect(usuarioId) {
+                historialViewModel.cargar(usuarioId)
             }
 
             HistorialScreen(
@@ -324,36 +310,37 @@ fun AppNavigation(
                 onSeleccionarFiltro = historialViewModel::seleccionarFiltro,
                 onVerDetalle = { registro ->
                     when (registro.ambito) {
-                        AmbitoRegistro.ANIMO -> navController.navigate(Destinos.crearRutaDetalle(registro.id))
-                        AmbitoRegistro.DBT -> navController.navigate(Destinos.crearRutaDetalleDbt(registro.id))
-                        AmbitoRegistro.NEURODESARROLLO -> navController.navigate(Destinos.crearRutaDetalleNeuro(registro.id))
-                        AmbitoRegistro.ADICCIONES -> navController.navigate(Destinos.crearRutaDetalleAdiccion(registro.id))
+                        AmbitoRegistro.ANIMO -> navController.navegarDesde(entrada, Destinos.crearRutaDetalle(registro.id))
+                        AmbitoRegistro.DBT -> navController.navegarDesde(entrada, Destinos.crearRutaDetalleDbt(registro.id))
+                        AmbitoRegistro.NEURODESARROLLO -> navController.navegarDesde(entrada, Destinos.crearRutaDetalleNeuro(registro.id))
+                        AmbitoRegistro.ADICCIONES -> navController.navegarDesde(entrada, Destinos.crearRutaDetalleAdiccion(registro.id))
                     }
                 },
                 onEditar = { registro ->
                     when (registro.ambito) {
-                        AmbitoRegistro.ANIMO -> navController.navigate(Destinos.crearRutaEditar(registro.id))
-                        AmbitoRegistro.DBT -> navController.navigate(Destinos.crearRutaEditarDbt(registro.id))
-                        AmbitoRegistro.NEURODESARROLLO -> navController.navigate(Destinos.crearRutaEditarNeuro(registro.id))
-                        AmbitoRegistro.ADICCIONES -> navController.navigate(Destinos.crearRutaEditarAdiccion(registro.id))
+                        AmbitoRegistro.ANIMO -> navController.navegarDesde(entrada, Destinos.crearRutaEditar(registro.id))
+                        AmbitoRegistro.DBT -> navController.navegarDesde(entrada, Destinos.crearRutaEditarDbt(registro.id))
+                        AmbitoRegistro.NEURODESARROLLO -> navController.navegarDesde(entrada, Destinos.crearRutaEditarNeuro(registro.id))
+                        AmbitoRegistro.ADICCIONES -> navController.navegarDesde(entrada, Destinos.crearRutaEditarAdiccion(registro.id))
                     }
                 },
                 onSolicitarEliminar = historialViewModel::solicitarEliminacion,
                 onCancelarEliminar = historialViewModel::cancelarEliminacion,
                 onConfirmarEliminar = historialViewModel::confirmarEliminacion,
-                onReintentar = { historialViewModel.cargar(usuarioDbtId) },
+                onReintentar = { historialViewModel.cargar(usuarioId) },
                 onVolver = { navController.popBackStack(route = Destinos.HOME, inclusive = false) }
             )
         }
 
-        composable(Destinos.DBT_CATALOGO) {
+        composable(Destinos.DBT_CATALOGO) { entrada ->
+            val dbtViewModel: DbtViewModel = viewModel()
             val state by dbtViewModel.uiState.collectAsState()
             CatalogoDbtScreen(
                 state = state,
                 onSeleccionarModulo = dbtViewModel::seleccionarModulo,
-                onVerHabilidad = { navController.navigate(Destinos.crearRutaHabilidadDbt(it)) },
+                onVerHabilidad = { navController.navegarDesde(entrada, Destinos.crearRutaHabilidadDbt(it)) },
                 onReintentar = dbtViewModel::cargarCatalogo,
-                onVolver = { navController.popBackStack() }
+                onVolver = { navController.volverDesde(entrada) }
             )
         }
 
@@ -361,13 +348,14 @@ fun AppNavigation(
             route = Destinos.DBT_HABILIDAD,
             arguments = listOf(navArgument("habilidadId") { type = NavType.IntType })
         ) { entrada ->
+            val dbtViewModel: DbtViewModel = viewModel()
             val state by dbtViewModel.uiState.collectAsState()
             DetalleHabilidadDbtScreen(
                 state = state,
                 habilidadId = entrada.arguments!!.getInt("habilidadId"),
-                onRegistrarPractica = { navController.navigate(Destinos.crearRutaNuevaPracticaDbt(it)) },
+                onRegistrarPractica = { navController.navegarDesde(entrada, Destinos.crearRutaNuevaPracticaDbt(it)) },
                 onReintentar = dbtViewModel::cargarCatalogo,
-                onVolver = { navController.popBackStack() }
+                onVolver = { navController.volverDesde(entrada) }
             )
         }
 
@@ -379,17 +367,17 @@ fun AppNavigation(
             val state by vm.uiState.collectAsState()
             val id = entrada.arguments?.getString("registroId") ?: ""
 
-            LaunchedEffect(usuarioDbtId, id) {
-                vm.cargar(usuarioDbtId, id, null)
+            LaunchedEffect(usuarioId, id) {
+                vm.cargar(usuarioId, id, null)
             }
 
             DetalleRegistroDbtScreen(
                 state = state,
-                onEditar = { navController.navigate(Destinos.crearRutaEditarDbt(id)) },
-                onVolver = { navController.popBackStack() },
+                onEditar = { navController.navegarDesde(entrada, Destinos.crearRutaEditarDbt(id)) },
+                onVolver = { navController.volverDesde(entrada) },
                 onEliminar = { navController.popBackStack() },
-                onVerHistorial = { navController.navigate(Destinos.HISTORIAL) },
-                onReintentar = { vm.cargar(usuarioDbtId, id, null) }
+                onVerHistorial = { navController.navegarDesde(entrada, Destinos.HISTORIAL) },
+                onReintentar = { vm.cargar(usuarioId, id, null) }
             )
         }
 
@@ -405,8 +393,8 @@ fun AppNavigation(
                 val id = entrada.arguments?.getString("registroId")
                 val habilidadId = if (editando) null else entrada.arguments?.getInt("habilidadId")
 
-                LaunchedEffect(usuarioDbtId, id, habilidadId) {
-                    vm.cargar(usuarioDbtId, id, habilidadId)
+                LaunchedEffect(usuarioId, id, habilidadId) {
+                    vm.cargar(usuarioId, id, habilidadId)
                 }
 
                 RegistroDbtScreen(
@@ -425,9 +413,9 @@ fun AppNavigation(
                         }
                     },
                     onReintentar = {
-                        vm.cargar(usuarioDbtId, id, habilidadId)
+                        vm.cargar(usuarioId, id, habilidadId)
                     },
-                    onVolver = { navController.popBackStack() }
+                    onVolver = { navController.volverDesde(entrada) }
                 )
             }
         }

@@ -41,7 +41,8 @@ fun CategoriaChipGrid(
     emoji: String,
     seleccionada: Boolean,
     onSelect: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
     val borderColor by animateColorAsState(
         targetValue = if (seleccionada) MaterialTheme.colorScheme.primary else Color.Transparent,
@@ -55,6 +56,7 @@ fun CategoriaChipGrid(
 
     Surface(
         onClick = onSelect,
+        enabled = enabled,
         shape = RoundedCornerShape(20.dp),
         color = containerColor,
         border = BorderStroke(2.dp, borderColor),
@@ -142,6 +144,19 @@ fun AvisoRegistroGuardado(visible: Boolean, editando: Boolean = false) {
                     color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold,
                     modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
             }
+        }
+    }
+}
+
+/** Estado bloqueante: nunca presentar valores anteriores como si fueran el registro solicitado. */
+@Composable
+internal fun EstadoRegistro(cargando: Boolean, error: String?, onReintentar: () -> Unit,
+    modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        if (cargando) CircularProgressIndicator()
+        else {
+            Text(error ?: "No se encontró el registro solicitado.", color = MaterialTheme.colorScheme.error)
+            TextButton(onClick = onReintentar) { Text("Reintentar") }
         }
     }
 }

@@ -11,7 +11,7 @@ data class CategoriaAnimo(
 // Modelo de dominio para la capa de UI y ViewModel
 data class RegistroAnimo(
     val id: String = UUID.randomUUID().toString(),
-    val usuarioId: String = "usr_demo_01",
+    val usuarioId: String,
     val categoriaId: Int,
     val categoriaNombre: String,
     val fechaHora: String,

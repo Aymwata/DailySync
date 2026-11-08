@@ -13,3 +13,23 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Configuración local del IDE y herramientas del asistente
+/.idea/
+/.kotlin/
+/.codex/
+/.agents/
+/.codex-remote-attachments/
+/AGENTS.md
+
+# Documentación, mediciones y artefactos locales de esta sesión
+/docs/
+/scripts/
+/artifacts/
+
+# Pruebas locales: esta rama versiona solo la aplicación ejecutable
+/app/src/androidTest/
+/app/src/test/
+
+# Salidas de compilación de todos los módulos
+**/build/

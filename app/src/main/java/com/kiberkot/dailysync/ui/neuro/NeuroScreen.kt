@@ -11,6 +11,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
+import androidx.activity.compose.BackHandler
+import com.kiberkot.dailysync.ui.components.EstadoRegistro
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,21 +36,27 @@ fun NeuroScreen(
     onCambioResultado: (Int) -> Unit,
     onGuardar: () -> Unit,
     onVolver: () -> Unit,
+    onReintentar: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    BackHandler(enabled = state.guardando || state.guardadoExitoso) { }
     Scaffold(
         modifier = Modifier.imePadding(),
         topBar = {
             TopAppBar(
                 title = { Text(if (editando) "Editar Neurodesarrollo" else "Neurodesarrollo", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onVolver) {
+                    IconButton(onClick = onVolver, enabled = !(state.guardando || state.guardadoExitoso)) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                     }
                 }
             )
         }
     ) { paddingValues ->
+        if (state.isLoading || state.cargaFallida || state.noDisponible) {
+            EstadoRegistro(state.isLoading, state.errorMsg, onReintentar, Modifier.padding(paddingValues))
+            return@Scaffold
+        }
         Column(
             modifier = modifier
                 .fillMaxSize()
@@ -72,6 +80,7 @@ fun NeuroScreen(
             Spacer(modifier = Modifier.height(20.dp))
 
             OutlinedTextField(
+                enabled = !state.guardando && !state.guardadoExitoso,
                 value = state.tipoActividad,
                 onValueChange = onCambioTipoActividad,
                 label = { Text("Tipo de Actividad / Tarea") },
@@ -90,6 +99,7 @@ fun NeuroScreen(
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text("Sobrecarga Sensorial: ${state.nivelSobrecarga} / 5", fontWeight = FontWeight.SemiBold)
                     Slider(
+                        enabled = !state.guardando && !state.guardadoExitoso,
                         value = state.nivelSobrecarga.toFloat(),
                         onValueChange = { onCambioSobrecarga(it.toInt()) },
                         valueRange = 1f..5f,
@@ -109,6 +119,7 @@ fun NeuroScreen(
             ) {
                 state.catalogoEstrategias.forEach { est ->
                     FilterChip(
+                        enabled = !state.guardando && !state.guardadoExitoso,
                         selected = state.idEstrategiaSeleccionada == est.idEstrategia,
                         onClick = { onSeleccionarEstrategia(est.idEstrategia) },
                         label = { Text(est.nombreEstrategia) }
@@ -119,6 +130,7 @@ fun NeuroScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
+                enabled = !state.guardando && !state.guardadoExitoso,
                 value = state.contexto,
                 onValueChange = onCambioContexto,
                 label = { Text("Contexto / Entorno (Opcional)") },
@@ -136,6 +148,7 @@ fun NeuroScreen(
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text("Resultado / Efectividad: ${state.resultadoPercibido} / 5", fontWeight = FontWeight.SemiBold)
                     Slider(
+                        enabled = !state.guardando && !state.guardadoExitoso,
                         value = state.resultadoPercibido.toFloat(),
                         onValueChange = { onCambioResultado(it.toInt()) },
                         valueRange = 1f..5f,
@@ -157,11 +170,11 @@ fun NeuroScreen(
 
             Button(
                 onClick = onGuardar,
-                enabled = !state.isLoading && !state.guardadoExitoso,
+                enabled = !state.isLoading && !state.guardando && !state.guardadoExitoso,
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth().height(52.dp)
             ) {
-                if (state.isLoading) CircularProgressIndicator(color = Color.White)
+                if (state.guardando) CircularProgressIndicator(color = Color.White)
                 else Text(if (editando) "Guardar Cambios" else "Guardar Registro", fontWeight = FontWeight.Bold)
             }
         }

@@ -10,21 +10,33 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.kiberkot.dailysync"
+        // Keep the identity of the optimized installation so updates preserve its data.
+        applicationId = "com.kiberkot.dailysync.performance"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
+        debug {
+            isDefault = false
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-dev"
+            resValue("string", "app_name", "DailySync Dev")
+        }
         release {
-            isMinifyEnabled = false
+            isDefault = true
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            // Same local key as the former performance build; supports in-place updates.
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "src/main/keepRules/rules.keep"
             )
         }
     }
@@ -42,6 +54,7 @@ android {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
+    implementation("androidx.core:core-splashscreen:1.0.1")
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
