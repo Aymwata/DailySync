@@ -1,5 +1,7 @@
 package com.kiberkot.dailysync.ui.adiccion
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -10,16 +12,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
-import com.kiberkot.dailysync.ui.components.EstadoRegistro
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.res.painterResource
+import com.kiberkot.dailysync.R
+import com.kiberkot.dailysync.ui.components.EstadoRegistro
+import com.kiberkot.dailysync.ui.theme.BarrasClarasMarca
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kiberkot.dailysync.ui.theme.DailySyncBrand
 import com.kiberkot.dailysync.viewmodel.AdiccionUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,29 +36,44 @@ fun DetalleAdiccionScreen(
     modifier: Modifier = Modifier,
     onReintentar: () -> Unit = {}
 ) {
+    BarrasClarasMarca()
+    val disponible = !state.isLoading && !state.cargaFallida && !state.noDisponible
     val accionNombre = state.catalogoAcciones.find {
         it.idAccionProtectora == state.idAccionSeleccionada
     }?.nombreAccion ?: "No especificada"
 
     Scaffold(
         modifier = modifier,
+        containerColor = DailySyncBrand.Background,
         topBar = {
             TopAppBar(
-                title = { Text("Detalle de Craving", fontWeight = FontWeight.Bold) },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = DailySyncBrand.Background,
+                    titleContentColor = DailySyncBrand.Ink,
+                    navigationIconContentColor = DailySyncBrand.Ink
+                ),
+                title = {
+                    Text(
+                        "Detalle de Craving",
+                        fontFamily = DailySyncBrand.Font,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onVolver) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                     }
                 },
                 actions = {
-                    IconButton(onClick = onEditar, enabled = !state.isLoading && !(state.cargaFallida || state.noDisponible)) {
-                        Icon(Icons.Default.Edit, contentDescription = "Editar")
+                    IconButton(onClick = onEditar, enabled = disponible) {
+                        Icon(Icons.Default.Edit, contentDescription = "Editar", tint = DailySyncBrand.Teal)
                     }
                 }
             )
         }
     ) { paddingValues ->
-        if (state.isLoading || state.cargaFallida || state.noDisponible) {
+        if (!disponible) {
             EstadoRegistro(state.isLoading, state.errorMsg, onReintentar, Modifier.padding(paddingValues))
             return@Scaffold
         }
@@ -70,50 +90,57 @@ fun DetalleAdiccionScreen(
                     .size(64.dp)
                     .align(Alignment.CenterHorizontally)
                     .clip(CircleShape)
-                    .background(Brush.horizontalGradient(listOf(Color(0xFFE53935), Color(0xFFFF7043)))),
+                    .background(Color(0xFFFBECE6)),
                 contentAlignment = Alignment.Center
             ) {
-                Text("🛡️", fontSize = 28.sp)
+                Image(painterResource(R.drawable.ic_module_adiccion), null, Modifier.size(48.dp))
             }
 
-            TarjetaDetalle(titulo = "Nivel de Impulso / Craving", valor = "${state.nivelImpulso} / 10")
-            TarjetaDetalle(titulo = "Desencadenante / Gatillo", valor = state.desencadenante.ifBlank { "Sin especificar" })
-            TarjetaDetalle(titulo = "Fecha y Hora del Registro", valor = state.fechaHora.ifBlank { "Fecha reciente" })
-            TarjetaDetalle(titulo = "Acción Protectora Aplicada", valor = accionNombre)
-            TarjetaDetalle(titulo = "Cumplimiento de Objetivo", valor = state.estadoObjetivo)
+            TarjetaDetalleBrand(titulo = "Nivel de Impulso / Craving", valor = "${state.nivelImpulso} / 10")
+            TarjetaDetalleBrand(titulo = "Desencadenante / Gatillo", valor = state.desencadenante.ifBlank { "Sin especificar" })
+            TarjetaDetalleBrand(titulo = "Fecha y Hora del Registro", valor = state.fechaHora.ifBlank { "Fecha reciente" })
+            TarjetaDetalleBrand(titulo = "Acción Protectora Aplicada", valor = accionNombre)
+            TarjetaDetalleBrand(titulo = "Cumplimiento de Objetivo", valor = state.estadoObjetivo)
 
             Button(
                 onClick = onEditar,
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(18.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = DailySyncBrand.Teal, contentColor = Color.White),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(50.dp)
+                    .height(52.dp)
             ) {
                 Icon(Icons.Default.Edit, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Editar Registro", fontWeight = FontWeight.Bold)
+                Text("Editar Registro", fontFamily = DailySyncBrand.Font, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             }
         }
     }
 }
 
 @Composable
-private fun TarjetaDetalle(titulo: String, valor: String) {
-    ElevatedCard(
+private fun TarjetaDetalleBrand(titulo: String, valor: String) {
+    Surface(
         shape = RoundedCornerShape(16.dp),
+        color = DailySyncBrand.Field,
+        border = BorderStroke(1.dp, DailySyncBrand.Border),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = titulo,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.error
+                fontFamily = DailySyncBrand.Font,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFFA56150)
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = valor,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold
+                fontFamily = DailySyncBrand.Font,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = DailySyncBrand.Ink
             )
         }
     }
