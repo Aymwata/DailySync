@@ -1,7 +1,5 @@
 package com.kiberkot.dailysync.navigation
 
-import kotlinx.coroutines.delay
-
 import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -32,6 +30,7 @@ import com.kiberkot.dailysync.ui.neuro.NeuroScreen
 import com.kiberkot.dailysync.ui.registro.DetalleAnimoScreen
 import com.kiberkot.dailysync.ui.registro.RegistroAnimoScreen
 import com.kiberkot.dailysync.viewmodel.*
+import kotlinx.coroutines.delay
 
 object Destinos {
     const val LOGIN = "login"
@@ -87,7 +86,27 @@ fun AppNavigation(
     val adiccionUiState by adiccionViewModel.uiState.collectAsState()
 
     val context = LocalContext.current
-    val usuarioDbtId = AppDatabase.USUARIO_DEMO
+    val usuarioActivoId = loginUiState.usuarioId ?: AppDatabase.USUARIO_DEMO
+
+    // Manejo automático de sesión guardada y de cierre de sesión
+    LaunchedEffect(loginUiState.usuarioId, loginUiState.restaurandoSesion) {
+        if (!loginUiState.restaurandoSesion) {
+            if (loginUiState.usuarioId != null) {
+                if (navController.currentDestination?.route == Destinos.LOGIN) {
+                    navController.navigate(Destinos.HOME) {
+                        popUpTo(Destinos.LOGIN) { inclusive = true }
+                    }
+                }
+            } else {
+                val rutaActual = navController.currentDestination?.route
+                if (rutaActual != Destinos.LOGIN && rutaActual != Destinos.REGISTER) {
+                    navController.navigate(Destinos.LOGIN) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
+            }
+        }
+    }
 
     LaunchedEffect(loginUiState.loginExitoso) {
         if (loginUiState.loginExitoso) {
@@ -152,12 +171,13 @@ fun AppNavigation(
         }
 
         composable(route = Destinos.HOME) {
-            LaunchedEffect(usuarioDbtId) {
-                homeViewModel.cargar(usuarioDbtId)
+            LaunchedEffect(usuarioActivoId) {
+                homeViewModel.cargar(usuarioActivoId)
             }
             HomeScreen(
                 state = homeUiState,
-                onReintentar = { homeViewModel.cargar(usuarioDbtId) },
+                onReintentar = { homeViewModel.cargar(usuarioActivoId) },
+                onCerrarSesion = { loginViewModel.cerrarSesion() },
                 onAbrirModulo = { modulo ->
                     when (modulo) {
                         ModuloHome.ANIMO -> navController.navigate(Destinos.REGISTRO)
@@ -179,7 +199,11 @@ fun AppNavigation(
             )
         }
 
+        // --- ÁNIMO (NUEVO / DETALLE / EDITAR) ---
         composable(route = Destinos.REGISTRO) {
+            LaunchedEffect(usuarioActivoId) {
+                animoViewModel.cargar(usuarioActivoId, null)
+            }
             RegistroAnimoScreen(
                 state = animoUiState,
                 editando = false,
@@ -197,6 +221,9 @@ fun AppNavigation(
             arguments = listOf(navArgument("registroId") { type = NavType.StringType })
         ) { entrada ->
             val id = entrada.arguments?.getString("registroId") ?: ""
+            LaunchedEffect(usuarioActivoId, id) {
+                animoViewModel.cargar(usuarioActivoId, id)
+            }
             DetalleAnimoScreen(
                 state = animoUiState,
                 registroId = id,
@@ -210,8 +237,9 @@ fun AppNavigation(
             arguments = listOf(navArgument("registroId") { type = NavType.StringType })
         ) { entrada ->
             val id = entrada.arguments?.getString("registroId") ?: ""
-            LaunchedEffect(id) {
-                animoViewModel.cargarParaEditar(id)
+
+            LaunchedEffect(usuarioActivoId, id) {
+                animoViewModel.cargar(usuarioActivoId, id)
             }
 
             RegistroAnimoScreen(
@@ -236,8 +264,8 @@ fun AppNavigation(
                 arguments = if (editando) listOf(navArgument("registroId") { type = NavType.StringType }) else emptyList()
             ) { entrada ->
                 val id = entrada.arguments?.getString("registroId")
-                LaunchedEffect(usuarioDbtId, id) {
-                    neuroViewModel.cargar(usuarioDbtId, id)
+                LaunchedEffect(usuarioActivoId, id) {
+                    neuroViewModel.cargar(usuarioActivoId, id)
                 }
 
                 NeuroScreen(
@@ -248,7 +276,7 @@ fun AppNavigation(
                     onSeleccionarEstrategia = neuroViewModel::seleccionarEstrategia,
                     onCambioContexto = neuroViewModel::cambiarContexto,
                     onCambioResultado = neuroViewModel::cambiarResultadoPercibido,
-                    onGuardar = { neuroViewModel.guardarRegistro(usuarioDbtId) },
+                    onGuardar = { neuroViewModel.guardarRegistro(usuarioActivoId) },
                     onVolver = { navController.popBackStack() }
                 )
             }
@@ -259,8 +287,8 @@ fun AppNavigation(
             arguments = listOf(navArgument("registroId") { type = NavType.StringType })
         ) { entrada ->
             val id = entrada.arguments?.getString("registroId") ?: ""
-            LaunchedEffect(usuarioDbtId, id) {
-                neuroViewModel.cargar(usuarioDbtId, id)
+            LaunchedEffect(usuarioActivoId, id) {
+                neuroViewModel.cargar(usuarioActivoId, id)
             }
 
             DetalleNeuroScreen(
@@ -278,8 +306,8 @@ fun AppNavigation(
                 arguments = if (editando) listOf(navArgument("registroId") { type = NavType.StringType }) else emptyList()
             ) { entrada ->
                 val id = entrada.arguments?.getString("registroId")
-                LaunchedEffect(usuarioDbtId, id) {
-                    adiccionViewModel.cargar(usuarioDbtId, id)
+                LaunchedEffect(usuarioActivoId, id) {
+                    adiccionViewModel.cargar(usuarioActivoId, id)
                 }
 
                 AdiccionScreen(
@@ -289,7 +317,7 @@ fun AppNavigation(
                     onCambioDesencadenante = adiccionViewModel::cambiarDesencadenante,
                     onSeleccionarAccion = adiccionViewModel::seleccionarAccion,
                     onCambioEstadoObjetivo = adiccionViewModel::cambiarEstadoObjetivo,
-                    onGuardar = { adiccionViewModel.guardarRegistro(usuarioDbtId) },
+                    onGuardar = { adiccionViewModel.guardarRegistro(usuarioActivoId) },
                     onVolver = { navController.popBackStack() }
                 )
             }
@@ -300,8 +328,8 @@ fun AppNavigation(
             arguments = listOf(navArgument("registroId") { type = NavType.StringType })
         ) { entrada ->
             val id = entrada.arguments?.getString("registroId") ?: ""
-            LaunchedEffect(usuarioDbtId, id) {
-                adiccionViewModel.cargar(usuarioDbtId, id)
+            LaunchedEffect(usuarioActivoId, id) {
+                adiccionViewModel.cargar(usuarioActivoId, id)
             }
 
             DetalleAdiccionScreen(
@@ -315,8 +343,8 @@ fun AppNavigation(
             val historialViewModel: HistorialViewModel = viewModel()
             val historialUiState by historialViewModel.uiState.collectAsState()
 
-            LaunchedEffect(usuarioDbtId) {
-                historialViewModel.cargar(usuarioDbtId)
+            LaunchedEffect(usuarioActivoId) {
+                historialViewModel.cargar(usuarioActivoId)
             }
 
             HistorialScreen(
@@ -341,7 +369,7 @@ fun AppNavigation(
                 onSolicitarEliminar = historialViewModel::solicitarEliminacion,
                 onCancelarEliminar = historialViewModel::cancelarEliminacion,
                 onConfirmarEliminar = historialViewModel::confirmarEliminacion,
-                onReintentar = { historialViewModel.cargar(usuarioDbtId) },
+                onReintentar = { historialViewModel.cargar(usuarioActivoId) },
                 onVolver = { navController.popBackStack(route = Destinos.HOME, inclusive = false) }
             )
         }
@@ -379,8 +407,8 @@ fun AppNavigation(
             val state by vm.uiState.collectAsState()
             val id = entrada.arguments?.getString("registroId") ?: ""
 
-            LaunchedEffect(usuarioDbtId, id) {
-                vm.cargar(usuarioDbtId, id, null)
+            LaunchedEffect(usuarioActivoId, id) {
+                vm.cargar(usuarioActivoId, id, null)
             }
 
             DetalleRegistroDbtScreen(
@@ -389,7 +417,7 @@ fun AppNavigation(
                 onVolver = { navController.popBackStack() },
                 onEliminar = { navController.popBackStack() },
                 onVerHistorial = { navController.navigate(Destinos.HISTORIAL) },
-                onReintentar = { vm.cargar(usuarioDbtId, id, null) }
+                onReintentar = { vm.cargar(usuarioActivoId, id, null) }
             )
         }
 
@@ -405,8 +433,8 @@ fun AppNavigation(
                 val id = entrada.arguments?.getString("registroId")
                 val habilidadId = if (editando) null else entrada.arguments?.getInt("habilidadId")
 
-                LaunchedEffect(usuarioDbtId, id, habilidadId) {
-                    vm.cargar(usuarioDbtId, id, habilidadId)
+                LaunchedEffect(usuarioActivoId, id, habilidadId) {
+                    vm.cargar(usuarioActivoId, id, habilidadId)
                 }
 
                 RegistroDbtScreen(
@@ -425,7 +453,7 @@ fun AppNavigation(
                         }
                     },
                     onReintentar = {
-                        vm.cargar(usuarioDbtId, id, habilidadId)
+                        vm.cargar(usuarioActivoId, id, habilidadId)
                     },
                     onVolver = { navController.popBackStack() }
                 )

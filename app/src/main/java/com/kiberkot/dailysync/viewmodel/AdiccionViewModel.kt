@@ -98,10 +98,10 @@ class AdiccionViewModel @JvmOverloads constructor(
         val clave = claveCarga ?: return
         if (usuarioId != clave.first || state.isLoading || state.guardando || state.guardadoExitoso || state.noDisponible || state.cargaFallida) return
         val error = if (state.desencadenante.trim().isEmpty()) "Describe el factor desencadenante."
-            else if (state.idAccionSeleccionada !in state.catalogoAcciones.map { it.idAccionProtectora }) "Selecciona una acción del catálogo."
-            else if (state.nivelImpulso !in 1..10) "El impulso debe estar entre 1 y 10."
-            else if (state.estadoObjetivo !in listOf("Logrado", "En proceso", "Resistido")) "Selecciona un objetivo válido."
-            else null
+        else if (state.idAccionSeleccionada !in state.catalogoAcciones.map { it.idAccionProtectora }) "Selecciona una acción del catálogo."
+        else if (state.nivelImpulso !in 1..10) "El impulso debe estar entre 1 y 10."
+        else if (state.estadoObjetivo !in listOf("Logrado", "En proceso", "Resistido")) "Selecciona un objetivo válido."
+        else null
         if (error != null) {
             _uiState.update { it.copy(errorMsg = error) }
             return
@@ -128,6 +128,16 @@ class AdiccionViewModel @JvmOverloads constructor(
             notificationHelper.mostrarNotificacionCheckIn("DailySync",
                 if (state.editando) "Registro actualizado." else "Nuevo registro guardado localmente.")
             _uiState.update { it.copy(guardando = false, guardadoExitoso = true) }
+        }
+    }
+
+    fun resetearEstado() {
+        _uiState.update {
+            it.copy(
+                guardadoExitoso = false,
+                guardando = false,
+                errorMsg = null
+            )
         }
     }
 }

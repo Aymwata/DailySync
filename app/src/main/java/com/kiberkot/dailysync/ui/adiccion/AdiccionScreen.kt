@@ -1,32 +1,55 @@
 package com.kiberkot.dailysync.ui.adiccion
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.*
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kiberkot.dailysync.R
+import com.kiberkot.dailysync.data.local.entities.CatalogoAdiccionEntity
 import com.kiberkot.dailysync.ui.components.AvisoRegistroGuardado
-import com.kiberkot.dailysync.ui.theme.DailySyncBrand
+import com.kiberkot.dailysync.ui.components.EstadoRegistro
+import com.kiberkot.dailysync.ui.theme.BarrasClarasMarca
+import com.kiberkot.dailysync.ui.theme.DailySyncBrand as Brand
 import com.kiberkot.dailysync.viewmodel.AdiccionUiState
 
-@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+private val AdiccionAccent = Color(0xFFA56150)
+private val AdiccionSoft = Color(0xFFFBECE6)
+private val AdiccionRed = Color(0xFFE53935)
+
+private fun textoAdiccion(size: Int, weight: FontWeight = FontWeight.Normal) = TextStyle(
+    fontFamily = Brand.Font,
+    fontSize = size.sp,
+    lineHeight = (size * 1.35f).sp,
+    fontWeight = weight
+)
+
 @Composable
 fun AdiccionScreen(
     state: AdiccionUiState,
@@ -37,334 +60,402 @@ fun AdiccionScreen(
     onCambioEstadoObjetivo: (String) -> Unit,
     onGuardar: () -> Unit,
     onVolver: () -> Unit,
+    onReintentar: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val focus = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
     val opcionesObjetivo = listOf("Logrado", "En proceso", "Resistido")
 
+    BackHandler(enabled = state.guardando || state.guardadoExitoso) { }
+    BarrasClarasMarca()
+
+    val disponible = !state.isLoading && !state.cargaFallida && !state.noDisponible
+    val guardar = {
+        keyboard?.hide()
+        focus.clearFocus()
+        onGuardar()
+    }
+
     Scaffold(
-        modifier = modifier.imePadding(),
-        containerColor = DailySyncBrand.Background,
+        modifier = modifier.fillMaxSize().imePadding(),
+        containerColor = Color(0xFFF6FAF7),
+        contentColor = Brand.Ink,
         topBar = {
-            TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DailySyncBrand.Background,
-                    titleContentColor = DailySyncBrand.Ink,
-                    navigationIconContentColor = DailySyncBrand.Ink
-                ),
-                title = {
-                    Text(
-                        text = if (editando) "Editar Craving" else "Adicciones y Craving",
-                        fontFamily = DailySyncBrand.Font,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onVolver) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Surface(shape = CircleShape, color = Color.White) {
+                    IconButton(
+                        onClick = onVolver,
+                        enabled = !state.guardando && !state.guardadoExitoso,
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_form_back),
+                            contentDescription = "Volver",
+                            tint = Brand.Ink,
+                            modifier = Modifier.size(21.dp)
+                        )
                     }
                 }
-            )
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    Text("Adicciones y Craving", style = textoAdiccion(12, FontWeight.Medium), color = AdiccionAccent)
+                    Text(
+                        if (editando) "Editar Craving" else "Nuevo Registro de Craving",
+                        style = textoAdiccion(20, FontWeight.SemiBold),
+                        color = Brand.Ink
+                    )
+                }
+                Surface(shape = RoundedCornerShape(14.dp), color = AdiccionSoft) {
+                    Box(Modifier.size(42.dp), contentAlignment = Alignment.Center) {
+                        Image(
+                            painter = painterResource(R.drawable.ic_module_adiccion),
+                            contentDescription = null,
+                            modifier = Modifier.size(34.dp)
+                        )
+                    }
+                }
+            }
+        },
+        bottomBar = {
+            if (disponible) {
+                Surface(
+                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, Brand.Border)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        state.errorMsg?.let { ErrorAdiccion(it) }
+
+                        AvisoRegistroGuardado(visible = state.guardadoExitoso, editando = editando)
+
+                        val shape = RoundedCornerShape(18.dp)
+                        Button(
+                            onClick = guardar,
+                            enabled = !state.guardando && !state.guardadoExitoso,
+                            shape = shape,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.Transparent,
+                                disabledContainerColor = Color.Transparent,
+                                contentColor = Color.White,
+                                disabledContentColor = Color.White
+                            ),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 52.dp)
+                                .background(Brush.horizontalGradient(listOf(Brand.Teal, Brand.Emerald)), shape)
+                        ) {
+                            when {
+                                state.guardadoExitoso -> Icon(painterResource(R.drawable.ic_home_check), null, Modifier.size(20.dp))
+                                state.guardando -> CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                                else -> Icon(painterResource(R.drawable.ic_home_check), null, Modifier.size(20.dp))
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                text = when {
+                                    state.guardadoExitoso -> if (editando) "Cambios guardados" else "Registro guardado"
+                                    state.guardando -> "Guardando…"
+                                    editando -> "Guardar cambios"
+                                    else -> "Guardar registro"
+                                },
+                                style = textoAdiccion(16, FontWeight.SemiBold)
+                            )
+                        }
+                        Text("Se guarda en este dispositivo", style = textoAdiccion(12), color = Brand.Muted)
+                    }
+                }
+            }
         }
-    ) { paddingValues ->
+    ) { padding ->
+        if (!disponible) {
+            EstadoRegistro(state.isLoading, state.errorMsg, onReintentar, Modifier.padding(padding))
+            return@Scaffold
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            // Header
-            Surface(
-                shape = RoundedCornerShape(22.dp),
-                color = DailySyncBrand.Field,
-                border = BorderStroke(1.dp, DailySyncBrand.Border),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(18.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(54.dp)
-                            .clip(CircleShape)
-                            .background(DailySyncBrand.Error.copy(alpha = 0.15f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("🛡️", fontSize = 28.sp)
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text(
-                            text = "Registro de Craving",
-                            fontFamily = DailySyncBrand.Font,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 17.sp,
-                            color = DailySyncBrand.Ink
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "Monitorea impulsos y aplica acciones protectoras.",
-                            fontFamily = DailySyncBrand.Font,
-                            fontSize = 13.sp,
-                            color = DailySyncBrand.Muted
-                        )
-                    }
-                }
-            }
 
-            // Nivel de Impulso
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = DailySyncBrand.Field,
-                border = BorderStroke(1.dp, DailySyncBrand.Border),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Nivel de Impulso / Craving",
-                            fontFamily = DailySyncBrand.Font,
-                            fontWeight = FontWeight.SemiBold,
-                            color = DailySyncBrand.Ink
-                        )
-                        Text(
-                            text = "${state.nivelImpulso} / 10",
-                            fontFamily = DailySyncBrand.Font,
-                            fontWeight = FontWeight.Bold,
-                            color = DailySyncBrand.Error
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Slider(
-                        value = state.nivelImpulso.toFloat(),
-                        onValueChange = { onCambioImpulso(it.toInt()) },
-                        valueRange = 1f..10f,
-                        steps = 8,
-                        colors = SliderDefaults.colors(
-                            thumbColor = DailySyncBrand.Error,
-                            activeTrackColor = DailySyncBrand.Error,
-                            inactiveTrackColor = DailySyncBrand.Border
-                        )
-                    )
-                }
-            }
-
-            // Desencadenante
-            OutlinedTextField(
-                value = state.desencadenante,
-                onValueChange = onCambioDesencadenante,
-                label = {
-                    Text(
-                        "Desencadenante / Gatillo",
-                        fontFamily = DailySyncBrand.Font,
-                        color = DailySyncBrand.Muted
-                    )
-                },
-                shape = RoundedCornerShape(16.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = DailySyncBrand.Field,
-                    unfocusedContainerColor = DailySyncBrand.Field,
-                    focusedBorderColor = DailySyncBrand.Teal,
-                    unfocusedBorderColor = DailySyncBrand.Border,
-                    focusedTextColor = DailySyncBrand.Ink,
-                    unfocusedTextColor = DailySyncBrand.Ink
-                ),
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            // Acción Protectora + Guía Explicativa
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    text = "Acción Protectora",
-                    fontFamily = DailySyncBrand.Font,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = DailySyncBrand.Ink,
-                    modifier = Modifier.align(Alignment.Start)
+                    if (editando) "Revisa tu registro de impulsos" else "Registro de Impulsos",
+                    style = textoAdiccion(25, FontWeight.Bold),
+                    color = Brand.Ink
                 )
-                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    "Monitorea el craving y registra las acciones protectoras aplicadas.",
+                    style = textoAdiccion(14),
+                    color = Brand.Muted
+                )
+            }
 
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
+
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                PasoAdiccion("1", "Ajusta el nivel de impulso")
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, Brand.Border)
                 ) {
-                    state.catalogoAcciones.forEach { acc ->
-                        val seleccionada = state.idAccionSeleccionada == acc.idAccionProtectora
-                        FilterChip(
-                            selected = seleccionada,
-                            onClick = { onSeleccionarAccion(acc.idAccionProtectora) },
-                            label = {
-                                Text(
-                                    text = acc.nombreAccion,
-                                    fontFamily = DailySyncBrand.Font,
-                                    fontWeight = if (seleccionada) FontWeight.Bold else FontWeight.Medium
-                                )
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = DailySyncBrand.Teal,
-                                selectedLabelColor = Color.White,
-                                containerColor = DailySyncBrand.Field,
-                                labelColor = DailySyncBrand.Ink
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                enabled = true,
-                                selected = seleccionada,
-                                borderColor = DailySyncBrand.Border,
-                                selectedBorderColor = DailySyncBrand.Teal
+                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Intensidad del craving", style = textoAdiccion(14, FontWeight.Medium), color = Brand.Ink)
+                            Text(
+                                "${state.nivelImpulso} / 10 · ${descripcionImpulso(state.nivelImpulso)}",
+                                style = textoAdiccion(12, FontWeight.SemiBold),
+                                color = AdiccionRed
                             )
+                        }
+                        Row(
+                            Modifier.fillMaxWidth().selectableGroup(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            (1..10).forEach { nivel ->
+                                val seleccionada = state.nivelImpulso == nivel
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (seleccionada) AdiccionRed else Color(0xFFF5F7F3),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .heightIn(min = 44.dp)
+                                        .selectable(
+                                            selected = seleccionada,
+                                            enabled = !state.guardando && !state.guardadoExitoso,
+                                            role = Role.RadioButton,
+                                            onClick = { onCambioImpulso(nivel) }
+                                        )
+                                ) {
+                                    Box(Modifier.padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
+                                        Text(
+                                            "$nivel",
+                                            style = textoAdiccion(13, FontWeight.SemiBold),
+                                            color = if (seleccionada) Color.White else Brand.Muted
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Bajo (1)", style = textoAdiccion(12), color = Brand.Muted)
+                            Text("Extremo (10)", style = textoAdiccion(12), color = Brand.Muted)
+                        }
+                    }
+                }
+            }
+
+
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                PasoAdiccion("2", "Identifica el desencadenante")
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, Brand.Border)
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("¿Qué factor o situación disparó la urgencia?", style = textoAdiccion(13), color = Brand.Muted)
+                        OutlinedTextField(
+                            enabled = !state.guardando && !state.guardadoExitoso,
+                            value = state.desencadenante,
+                            onValueChange = onCambioDesencadenante,
+                            textStyle = textoAdiccion(16),
+                            placeholder = { Text("Ej. Estrés laboral, discusión, lugar específico", style = textoAdiccion(14), color = Color(0xFF7A9389)) },
+                            shape = RoundedCornerShape(18.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = Brand.Field, unfocusedContainerColor = Brand.Field,
+                                focusedBorderColor = Brand.Teal, unfocusedBorderColor = Brand.Border,
+                                focusedTextColor = Brand.Ink, unfocusedTextColor = Brand.Ink
+                            ),
+                            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Next),
+                            keyboardActions = KeyboardActions(onNext = { focus.moveFocus(androidx.compose.ui.focus.FocusDirection.Down) }),
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
+            }
 
-                val accionSeleccionada = state.catalogoAcciones.find { it.idAccionProtectora == state.idAccionSeleccionada }
-                AnimatedVisibility(
-                    visible = accionSeleccionada != null,
-                    enter = fadeIn(),
-                    exit = fadeOut()
+
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                PasoAdiccion("3", "Elige una acción protectora")
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    state.catalogoAcciones.forEach { acc ->
+                        OpcionAccionAdiccion(
+                            accion = acc,
+                            seleccionada = state.idAccionSeleccionada == acc.idAccionProtectora,
+                            enabled = !state.guardando && !state.guardadoExitoso,
+                            onSelect = { onSeleccionarAccion(acc.idAccionProtectora) }
+                        )
+                    }
+                }
+            }
+
+
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                PasoAdiccion("4", "Cumplimiento de objetivo")
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, Brand.Border)
                 ) {
-                    accionSeleccionada?.let { acc ->
-                        val descripcion = when {
-                            acc.nombreAccion.contains("Surf", ignoreCase = true) || acc.nombreAccion.contains("Ola", ignoreCase = true) ->
-                                "Surfear la Ola (Urge Surfing): Observa la necesidad sin actuar durante 15 minutos. Comprende que el impulso sube a una cima y luego desciende naturalmente."
-                            acc.nombreAccion.contains("Entorno", ignoreCase = true) || acc.nombreAccion.contains("Cambio", ignoreCase = true) ->
-                                "Cambio de Entorno: Abandona el lugar físico o apaga el estímulo disparador inmediatamente para romper el bucle de la compulsión."
-                            acc.nombreAccion.contains("Soporte", ignoreCase = true) || acc.nombreAccion.contains("Contacto", ignoreCase = true) ->
-                                "Contacto de Soporte: Llama o escribe a una persona de confianza declarando el impulso abiertamente para diluir la urgencia emocional."
-                            acc.nombreAccion.contains("Sensorial", ignoreCase = true) || acc.nombreAccion.contains("Contraste", ignoreCase = true) ->
-                                "Estímulo Sensorial de Contraste: Utiliza agua fría en el rostro o hielo en las manos para activar la respuesta vagal y frenar el craving."
-                            else -> "Acción preventiva de contención diseñada para proteger tu proceso de autocontrol y evitar la recaída."
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = DailySyncBrand.Teal.copy(alpha = 0.08f),
-                            border = BorderStroke(1.dp, DailySyncBrand.Teal.copy(alpha = 0.3f)),
-                            modifier = Modifier.fillMaxWidth()
+                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("Estado del autocontrol durante la urgencia", style = textoAdiccion(13), color = Brand.Muted)
+                        Row(
+                            Modifier.fillMaxWidth().selectableGroup(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Row(
-                                modifier = Modifier.padding(14.dp),
-                                verticalAlignment = Alignment.Top
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Info,
-                                    contentDescription = null,
-                                    tint = DailySyncBrand.Teal,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column {
-                                    Text(
-                                        text = "🛡️ Guía de la acción protectora",
-                                        fontFamily = DailySyncBrand.Font,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp,
-                                        color = DailySyncBrand.Ink
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = descripcion,
-                                        fontFamily = DailySyncBrand.Font,
-                                        fontSize = 13.sp,
-                                        color = DailySyncBrand.Ink.copy(alpha = 0.85f)
-                                    )
+                            opcionesObjetivo.forEach { opcion ->
+                                val seleccionada = state.estadoObjetivo == opcion
+                                Surface(
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = if (seleccionada) Brand.Emerald else Color(0xFFF5F7F3),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .heightIn(min = 46.dp)
+                                        .selectable(
+                                            selected = seleccionada,
+                                            enabled = !state.guardando && !state.guardadoExitoso,
+                                            role = Role.RadioButton,
+                                            onClick = { onCambioEstadoObjetivo(opcion) }
+                                        )
+                                ) {
+                                    Box(Modifier.padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
+                                        Text(
+                                            opcion,
+                                            style = textoAdiccion(14, FontWeight.SemiBold),
+                                            color = if (seleccionada) Color.White else Brand.Muted
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
+        }
+    }
+}
 
-            // Cumplimiento de Objetivo
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "Cumplimiento de Objetivo",
-                    fontFamily = DailySyncBrand.Font,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = DailySyncBrand.Ink,
-                    modifier = Modifier.align(Alignment.Start)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
+@Composable
+private fun PasoAdiccion(numero: String, titulo: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Surface(shape = CircleShape, color = AdiccionSoft) {
+            Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) {
+                Text(numero, style = textoAdiccion(12, FontWeight.SemiBold), color = AdiccionAccent)
+            }
+        }
+        Text(titulo, style = textoAdiccion(17, FontWeight.SemiBold), color = Brand.Ink)
+    }
+}
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    opcionesObjetivo.forEach { obj ->
-                        val seleccionado = state.estadoObjetivo == obj
-                        FilterChip(
-                            selected = seleccionado,
-                            onClick = { onCambioEstadoObjetivo(obj) },
-                            label = {
-                                Text(
-                                    text = obj,
-                                    fontFamily = DailySyncBrand.Font,
-                                    fontWeight = if (seleccionado) FontWeight.Bold else FontWeight.Medium
-                                )
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = DailySyncBrand.Emerald,
-                                selectedLabelColor = Color.White,
-                                containerColor = DailySyncBrand.Field,
-                                labelColor = DailySyncBrand.Ink
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                enabled = true,
-                                selected = seleccionado,
-                                borderColor = DailySyncBrand.Border,
-                                selectedBorderColor = DailySyncBrand.Emerald
-                            )
-                        )
-                    }
+@Composable
+private fun OpcionAccionAdiccion(
+    accion: CatalogoAdiccionEntity,
+    seleccionada: Boolean,
+    enabled: Boolean,
+    onSelect: () -> Unit
+) {
+    val descripcion = when {
+        accion.nombreAccion.contains("Surf", ignoreCase = true) || accion.nombreAccion.contains("Ola", ignoreCase = true) ->
+            "Observa la necesidad sin actuar durante 15 minutos. El impulso sube a una cima y desciende naturalmente."
+        accion.nombreAccion.contains("Entorno", ignoreCase = true) || accion.nombreAccion.contains("Cambio", ignoreCase = true) ->
+            "Abandona el lugar físico o apaga el estímulo disparador inmediatamente para romper el bucle compulsivo."
+        accion.nombreAccion.contains("Soporte", ignoreCase = true) || accion.nombreAccion.contains("Contacto", ignoreCase = true) ->
+            "Llama o escribe a una persona de confianza declarando el impulso abiertamente para diluir la urgencia."
+        accion.nombreAccion.contains("Sensorial", ignoreCase = true) || accion.nombreAccion.contains("Contraste", ignoreCase = true) ->
+            "Utiliza agua fría en el rostro o hielo en las manos para activar la respuesta vagal y frenar el craving."
+        else -> "Acción preventiva de contención para proteger tu autocontrol."
+    }
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = if (seleccionada) AdiccionSoft else Color.White,
+        border = BorderStroke(if (seleccionada) 1.5.dp else 1.dp, if (seleccionada) AdiccionAccent else Brand.Border),
+        modifier = Modifier
+            .fillMaxWidth()
+            .selectable(selected = seleccionada, enabled = enabled, role = Role.RadioButton, onClick = onSelect)
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Surface(shape = RoundedCornerShape(14.dp), color = Color(0xFFFBE4DC)) {
+                Box(Modifier.size(42.dp), contentAlignment = Alignment.Center) {
+                    Image(
+                        painter = painterResource(R.drawable.ic_module_adiccion),
+                        contentDescription = null,
+                        modifier = Modifier.size(30.dp)
+                    )
                 }
             }
 
-            state.errorMsg?.let {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    text = it,
-                    fontFamily = DailySyncBrand.Font,
-                    color = DailySyncBrand.Error,
-                    fontSize = 13.sp
+                    text = "Acción protectora",
+                    style = textoAdiccion(11, FontWeight.SemiBold),
+                    color = AdiccionAccent
+                )
+                Text(
+                    text = accion.nombreAccion,
+                    style = textoAdiccion(15, FontWeight.SemiBold),
+                    color = if (seleccionada) AdiccionAccent else Brand.Ink
+                )
+                Text(
+                    text = descripcion,
+                    style = textoAdiccion(12),
+                    color = Brand.Muted
                 )
             }
 
-            AvisoRegistroGuardado(
-                visible = state.guardadoExitoso, editando = editando
-            )
-
-            Button(
-                onClick = onGuardar,
-                enabled = !state.isLoading && !state.guardadoExitoso,
-                shape = RoundedCornerShape(18.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = DailySyncBrand.Teal,
-                    contentColor = Color.White,
-                    disabledContainerColor = DailySyncBrand.Border,
-                    disabledContentColor = DailySyncBrand.Muted
-                ),
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(54.dp)
+                    .size(20.dp)
+                    .background(if (seleccionada) AdiccionAccent else Color.White, CircleShape)
+                    .border(1.dp, if (seleccionada) AdiccionAccent else Color(0xFFCADCD2), CircleShape),
+                contentAlignment = Alignment.Center
             ) {
-                if (state.isLoading) {
-                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                } else {
-                    Text(
-                        text = if (editando) "Guardar Cambios" else "Guardar Registro",
-                        fontFamily = DailySyncBrand.Font,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
+                if (seleccionada) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_home_check),
+                        contentDescription = null,
+                        modifier = Modifier.size(12.dp),
+                        tint = Color.White
                     )
                 }
             }
         }
     }
+}
+@Composable
+private fun ErrorAdiccion(mensaje: String) {
+    Text(mensaje, style = textoAdiccion(12), color = Brand.Error)
+}
+
+private fun descripcionImpulso(valor: Int) = when (valor) {
+    in 1..3 -> "Leve"
+    in 4..6 -> "Moderado"
+    in 7..8 -> "Intenso"
+    in 9..10 -> "Extremo"
+    else -> "Selecciona intensidad"
 }

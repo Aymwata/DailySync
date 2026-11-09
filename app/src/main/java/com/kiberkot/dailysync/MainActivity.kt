@@ -8,15 +8,15 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.lifecycle.ViewModelProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import com.kiberkot.dailysync.viewmodel.LoginViewModel
+import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.ViewModelProvider
 import com.kiberkot.dailysync.navigation.AppNavigation
 import com.kiberkot.dailysync.ui.theme.DailySyncTheme
+import com.kiberkot.dailysync.viewmodel.LoginViewModel
 
 class MainActivity : ComponentActivity() {
 
@@ -37,7 +37,7 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(sesion.restaurandoSesion, sesion.errorSesion) {
                     if (!sesion.restaurandoSesion && sesion.errorSesion == null) solicitarPermisoNotificaciones()
                 }
-                AppNavigation(login)
+                AppNavigation(loginViewModel = login)
             }
         }
     }

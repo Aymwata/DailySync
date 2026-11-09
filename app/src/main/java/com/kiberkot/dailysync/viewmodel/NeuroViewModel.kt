@@ -104,9 +104,9 @@ class NeuroViewModel @JvmOverloads constructor(
         val clave = claveCarga ?: return
         if (usuarioId != clave.first || state.isLoading || state.guardando || state.guardadoExitoso || state.noDisponible || state.cargaFallida) return
         val error = if (state.tipoActividad.trim().isEmpty()) "Especifica el tipo de actividad o rutina."
-            else if (state.idEstrategiaSeleccionada !in state.catalogoEstrategias.map { it.idEstrategia }) "Selecciona una estrategia del catálogo."
-            else if (state.nivelSobrecarga !in 1..5 || state.resultadoPercibido !in 1..5) "Las escalas deben estar entre 1 y 5."
-            else null
+        else if (state.idEstrategiaSeleccionada !in state.catalogoEstrategias.map { it.idEstrategia }) "Selecciona una estrategia del catálogo."
+        else if (state.nivelSobrecarga !in 1..5 || state.resultadoPercibido !in 1..5) "Las escalas deben estar entre 1 y 5."
+        else null
         if (error != null) {
             _uiState.update { it.copy(errorMsg = error) }
             return
@@ -133,6 +133,16 @@ class NeuroViewModel @JvmOverloads constructor(
             notificationHelper.mostrarNotificacionCheckIn("DailySync",
                 if (state.editando) "Registro actualizado." else "Nuevo registro guardado localmente.")
             _uiState.update { it.copy(guardando = false, guardadoExitoso = true) }
+        }
+    }
+
+    fun resetearEstado() {
+        _uiState.update {
+            it.copy(
+                guardadoExitoso = false,
+                guardando = false,
+                errorMsg = null
+            )
         }
     }
 }

@@ -153,4 +153,5 @@ class AnimoViewModel @JvmOverloads constructor(
         }
         return true
     }
+
 }
