@@ -28,6 +28,9 @@ fun DailySyncTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
+    // Todas las pantallas comparten barras claras. Configurarlas una vez evita
+    // restaurar/reaplicar flags de Window al superponerse destinos durante la transición.
+    BarrasClarasMarca()
     val colors = if (darkTheme) DarkColorScheme else LightColorScheme
 
     MaterialTheme(

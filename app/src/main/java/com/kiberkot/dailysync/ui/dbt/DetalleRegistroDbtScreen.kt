@@ -40,6 +40,7 @@ fun DetalleRegistroDbtScreen(
                     DbtTarjeta(color = guia?.fondo ?: DbtLavender) {
                         Image(painterResource(guia?.icono ?: R.drawable.ic_module_dbt), null, Modifier.size(56.dp))
                         Text("Habilidad practicada", style = textoDbt(12, FontWeight.Medium), color = guia?.acento ?: DbtPurple)
+                        if (registro.editado) Text("Editado", style = textoDbt(12, FontWeight.SemiBold), color = Brand.Teal)
                         Text(registro.habilidadNombre, style = textoDbt(25, FontWeight.Bold))
                         Text(guia?.modulo ?: registro.modulo, style = textoDbt(14), color = Brand.Muted)
                     }
@@ -51,7 +52,7 @@ fun DetalleRegistroDbtScreen(
                     }
                 }
                 item { DbtValorRegistrado("Intensidad de la emoción", registro.intensidad,
-                    Color(0xFFFAEEE5), Color(0xFF95613F), "Suave", "Muy intensa") }
+                    Color(0xFFFAEEE5), Color(0xFF95613F), "Sin síntomas", "Severa", registro.versionEscala) }
                 item { DbtValorRegistrado("Cuánto te ayudó", registro.utilidad,
                     Color(0xFFEAF5EF), Color(0xFF467560), "Poco útil", "Muy útil") }
             }
@@ -60,22 +61,20 @@ fun DetalleRegistroDbtScreen(
 }
 
 @Composable
-private fun DbtValorRegistrado(titulo: String, valor: Int, fondo: Color, acento: Color, minimo: String, maximo: String) {
+private fun DbtValorRegistrado(titulo: String, valor: Int, fondo: Color, acento: Color, minimo: String, maximo: String, versionEscala: Int? = null) {
     DbtTarjeta {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically) {
-            Text(titulo, style = textoDbt(16, FontWeight.SemiBold), modifier = Modifier.weight(1f))
-            Text("$valor/5", style = textoDbt(20, FontWeight.Bold), color = acento)
-        }
+        Text(titulo, style = textoDbt(16, FontWeight.SemiBold))
+        Text(if (versionEscala == null) "$valor/5" else com.kiberkot.dailysync.model.textoIntensidad(valor, versionEscala),
+            style = textoDbt(20, FontWeight.Bold), color = acento)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            repeat(5) { indice ->
+            repeat(if (versionEscala == 2) 4 else 5) { indice ->
                 Surface(modifier = Modifier.weight(1f).height(8.dp), shape = RoundedCornerShape(4.dp),
                     color = if (indice < valor) acento else fondo) { }
             }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(minimo, style = textoDbt(12), color = Brand.Muted)
-            Text(maximo, style = textoDbt(12), color = Brand.Muted)
+            Text(if (versionEscala == 1) "Suave" else minimo, style = textoDbt(12), color = Brand.Muted)
+            Text(if (versionEscala == 1) "Muy intensa" else maximo, style = textoDbt(12), color = Brand.Muted)
         }
     }
 }

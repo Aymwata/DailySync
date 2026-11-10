@@ -48,6 +48,7 @@ data class HomeUiState(
     val saludo: String = "",
     val iniciales: String = "US",
     val actividadSemanal: List<ActividadDiaUi> = emptyList(),
+    val actividadCargada: Boolean = false,
     val error: String? = null
 )
 
@@ -90,7 +91,7 @@ class HomeViewModel @JvmOverloads constructor(
                     .distinctUntilChanged()
                     .flowOn(Dispatchers.Default)
                     .collect { actividad ->
-                        _uiState.update { it.copy(actividadSemanal = actividad, error = null) }
+                        _uiState.update { it.copy(actividadSemanal = actividad, actividadCargada = true, error = null) }
                     }
             } catch (e: CancellationException) {
                 throw e

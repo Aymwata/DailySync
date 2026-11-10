@@ -31,7 +31,7 @@ import com.kiberkot.dailysync.data.local.entities.RegistroAdiccionEntity
         CatalogoAdiccionEntity::class,
         RegistroAdiccionEntity::class
     ],
-    version = 3,
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -39,6 +39,23 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun dailySyncDao(): DailySyncDao
 
     companion object {
+        val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Antes eran datos de ejemplo sin programación real. La nueva función requiere activación explícita.
+                db.execSQL("UPDATE USUARIO_PRUEBA SET recordatorio_activo = 0")
+            }
+        }
+
+        val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                listOf("REGISTRO_ANIMO", "REGISTRO_DBT", "REGISTRO_NEURO", "REGISTRO_ADICCION").forEach { tabla ->
+                    db.execSQL("ALTER TABLE $tabla ADD COLUMN version_escala INTEGER NOT NULL DEFAULT 1")
+                    db.execSQL("ALTER TABLE $tabla ADD COLUMN editado INTEGER NOT NULL DEFAULT 0")
+                }
+                db.execSQL("ALTER TABLE REGISTRO_ADICCION ADD COLUMN otra_accion TEXT")
+                db.execSQL("ALTER TABLE USUARIO_PRUEBA ADD COLUMN objetivo_adiccion TEXT NOT NULL DEFAULT 'Aplicar una acción protectora ante un impulso'")
+            }
+        }
 
         const val USUARIO_DEMO = "usr_demo_01"
 
@@ -133,7 +150,8 @@ abstract class AppDatabase : RoomDatabase() {
             CatalogoAdiccionEntity(idAccionProtectora = 1, nombreAccion = "Surfear el impulso (Urge Surfing - 10 min)"),
             CatalogoAdiccionEntity(idAccionProtectora = 2, nombreAccion = "Contacto con red de apoyo"),
             CatalogoAdiccionEntity(idAccionProtectora = 3, nombreAccion = "Cambio de entorno / Actividad física breve"),
-            CatalogoAdiccionEntity(idAccionProtectora = 4, nombreAccion = "Distracción cognitiva inmediata")
+            CatalogoAdiccionEntity(idAccionProtectora = 4, nombreAccion = "Distracción cognitiva inmediata"),
+            CatalogoAdiccionEntity(idAccionProtectora = 5, nombreAccion = "Otra (especificar)")
         )
         @Volatile
         private var INSTANCE: AppDatabase? = null
@@ -145,7 +163,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "dailysync_offline_db"
                 )
-                    .fallbackToDestructiveMigration()
+                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5)
                     .addCallback(PrepopulateCallback())
                     .build()
                 INSTANCE = instance
@@ -174,7 +192,7 @@ abstract class AppDatabase : RoomDatabase() {
                 put("correo", "demo@dailysync.app")
                 put("password", "1234")
                 put("token_sesion", "token_ficticio_123")
-                put("recordatorio_activo", true)
+                put("recordatorio_activo", false)
                 put("hora_recordatorio", "20:00")
             }
             db.insert("USUARIO_PRUEBA", SQLiteDatabase.CONFLICT_IGNORE, usuario)

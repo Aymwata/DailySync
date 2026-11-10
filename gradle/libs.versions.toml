@@ -12,8 +12,10 @@ composeBom = "2024.11.00"
 navigationCompose = "2.8.4"
 room = "2.6.1"
 room3Common = "3.0.3"
+profileInstaller = "1.4.0"
 
 [libraries]
+androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version.ref = "profileInstaller" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }

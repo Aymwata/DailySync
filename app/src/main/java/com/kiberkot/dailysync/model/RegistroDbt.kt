@@ -10,12 +10,14 @@ data class RegistroDbt(
     val situacion: String,
     val intensidad: Int,
     val utilidad: Int,
-    val pendienteSync: Boolean
+    val pendienteSync: Boolean,
+    val versionEscala: Int = 2,
+    val editado: Boolean = false
 )
 
 data class FormularioDbt(
     val habilidadId: Int? = null,
     val situacion: String = "",
-    val intensidad: Int = 3,
+    val intensidad: Int = 2,
     val utilidad: Int = 3
 )

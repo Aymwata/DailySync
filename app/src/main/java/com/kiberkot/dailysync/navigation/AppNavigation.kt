@@ -6,11 +6,16 @@ import androidx.compose.animation.ExitTransition
 
 import android.widget.Toast
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -29,6 +34,7 @@ import com.kiberkot.dailysync.ui.home.HomeScreen
 import com.kiberkot.dailysync.ui.login.LoginScreen
 import com.kiberkot.dailysync.ui.login.InicioSesionScreen
 import com.kiberkot.dailysync.ui.login.RegisterScreen
+import com.kiberkot.dailysync.ui.login.ConsentimientoScreen
 import com.kiberkot.dailysync.ui.neuro.DetalleNeuroScreen
 import com.kiberkot.dailysync.ui.neuro.NeuroScreen
 import com.kiberkot.dailysync.ui.registro.DetalleAnimoScreen
@@ -39,8 +45,11 @@ object Destinos {
     const val LOGIN = "login"
     const val REGISTER = "register"
     const val HOME = "home"
+    const val MIS_DATOS = "mis_datos"
+    const val NOTIFICACIONES = "notificaciones"
     const val REGISTRO = "registro"
     const val HISTORIAL = "historial"
+    const val REGISTRO_RAPIDO = "registro_rapido"
 
     const val NEURO = "neuro"
     const val NEURO_EDITAR = "neuro/editar/{registroId}"
@@ -72,6 +81,15 @@ object Destinos {
 
 @Composable
 fun AppNavigation(loginViewModel: LoginViewModel = viewModel()) {
+    CompositionLocalProvider(com.kiberkot.dailysync.ui.components.LocalActividadSesion provides loginViewModel::registrarInteraccion) {
+        Box(Modifier.fillMaxSize().onPreviewKeyEvent { !loginViewModel.registrarInteraccion() }) {
+            NavegacionConControlDeSesion(loginViewModel)
+        }
+    }
+}
+
+@Composable
+private fun NavegacionConControlDeSesion(loginViewModel: LoginViewModel) {
     val loginUiState by loginViewModel.uiState.collectAsState()
     if (loginUiState.restaurandoSesion || loginUiState.errorSesion != null) {
         InicioSesionScreen(loginUiState.errorSesion, loginViewModel::restaurarSesion)
@@ -116,31 +134,73 @@ fun AppNavigation(loginViewModel: LoginViewModel = viewModel()) {
         }
     } else {
         // Las rutas privadas solo se componen mientras existe una cuenta autenticada.
-        key(usuarioId) { NavegacionSesion(usuarioId, loginViewModel::cerrarSesion) }
+        key(usuarioId) {
+            val consentimiento: ConsentimientoViewModel = viewModel(key = "consentimiento_$usuarioId")
+            val estado by consentimiento.uiState.collectAsState()
+            LaunchedEffect(usuarioId) { consentimiento.cargar(usuarioId) }
+            if (!estado.aceptado || estado.cargando) {
+                ConsentimientoScreen(estado, consentimiento::aceptar, loginViewModel::cerrarSesion,
+                    { consentimiento.cargar(usuarioId) })
+            } else {
+                NavegacionSesion(usuarioId, loginViewModel::cerrarSesion, estado)
+            }
+        }
     }
 }
 
 @Composable
-private fun NavegacionSesion(usuarioId: String, onCerrarSesion: () -> Unit) {
+private fun NavegacionSesion(usuarioId: String, onCerrarSesion: () -> Unit,
+    consentimiento: ConsentimientoUiState) {
     val navController = rememberNavController()
     val context = LocalContext.current
     NavHost(navController = navController, startDestination = Destinos.HOME,
         enterTransition = { entradaRapida() }, exitTransition = { ExitTransition.None },
         // Regreso inmediato: una pantalla que sale no debe tapar los toques del Home.
         popEnterTransition = { EnterTransition.None }, popExitTransition = { ExitTransition.None }) {
+        composable(Destinos.REGISTRO_RAPIDO) { entrada ->
+            com.kiberkot.dailysync.ui.registro.RegistroRapidoScreen(usuarioId) {
+                if (navController.currentBackStackEntry == entrada) {
+                    navController.popBackStack(Destinos.HOME, inclusive = false)
+                }
+            }
+        }
+        composable(Destinos.NOTIFICACIONES) { entrada ->
+            val vm: NotificacionesViewModel = viewModel()
+            val state by vm.uiState.collectAsState()
+            LaunchedEffect(usuarioId) { vm.cargar(usuarioId) }
+            com.kiberkot.dailysync.ui.notificaciones.NotificacionesScreen(state,
+                vm::cambiarActivo, vm::cambiarHora, vm::actualizarPermisos, vm::reintentar,
+                { navController.volverDesde(entrada) })
+        }
+        composable(Destinos.MIS_DATOS) { entrada ->
+            ConsentimientoScreen(consentimiento, {}, { navController.volverDesde(entrada) }, {}, soloLectura = true)
+        }
         composable(route = Destinos.HOME) { entrada ->
             val homeViewModel: HomeViewModel = viewModel()
             val homeUiState by homeViewModel.uiState.collectAsState()
             LaunchedEffect(usuarioId) {
-                homeViewModel.cargar(usuarioId)
+                while (true) {
+                    homeViewModel.cargar(usuarioId)
+                    // Refresca al cambiar de día, incluso si Inicio permanece abierto.
+                    val ahora = java.util.Calendar.getInstance()
+                    val manana = (ahora.clone() as java.util.Calendar).apply {
+                        add(java.util.Calendar.DAY_OF_YEAR, 1)
+                        set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0)
+                        set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
+                    }
+                    delay((manana.timeInMillis - ahora.timeInMillis).coerceAtLeast(1_000))
+                }
             }
             HomeScreen(
                 state = homeUiState,
+                onRegistroRapido = { navController.navegarDesde(entrada, Destinos.REGISTRO_RAPIDO) },
                 onCerrarSesion = {
                     navController.popBackStack(navController.graph.id, inclusive = true)
                     onCerrarSesion()
                 },
                 onReintentar = { homeViewModel.cargar(usuarioId) },
+                onMisDatos = { navController.navegarDesde(entrada, Destinos.MIS_DATOS) },
+                onNotificaciones = { navController.navegarDesde(entrada, Destinos.NOTIFICACIONES) },
                 onAbrirModulo = { modulo ->
                     when (modulo) {
                         ModuloHome.ANIMO -> navController.navegarDesde(entrada, Destinos.REGISTRO)
@@ -254,8 +314,8 @@ private fun NavegacionSesion(usuarioId: String, onCerrarSesion: () -> Unit) {
                 val adiccionViewModel: AdiccionViewModel = viewModel()
                 val adiccionUiState by adiccionViewModel.uiState.collectAsState()
                 val id = entrada.arguments?.getString("registroId")
-                LaunchedEffect(adiccionUiState.guardadoExitoso) {
-                    if (adiccionUiState.guardadoExitoso) {
+                LaunchedEffect(adiccionUiState.guardadoExitoso, adiccionUiState.mostrarApoyo) {
+                    if (adiccionUiState.guardadoExitoso && !adiccionUiState.mostrarApoyo) {
                         delay(1000L)
                         if (navController.currentBackStackEntry == entrada) navController.popBackStack()
                     }
@@ -268,6 +328,9 @@ private fun NavegacionSesion(usuarioId: String, onCerrarSesion: () -> Unit) {
                     state = adiccionUiState,
                     editando = editando,
                     onCambioImpulso = adiccionViewModel::cambiarNivelImpulso,
+                    onSeleccionarDesencadenante = adiccionViewModel::seleccionarDesencadenante,
+                    onCambioOtraAccion = adiccionViewModel::cambiarOtraAccion,
+                    onCerrarApoyo = adiccionViewModel::cerrarApoyo,
                     onCambioDesencadenante = adiccionViewModel::cambiarDesencadenante,
                     onSeleccionarAccion = adiccionViewModel::seleccionarAccion,
                     onCambioEstadoObjetivo = adiccionViewModel::cambiarEstadoObjetivo,
@@ -308,6 +371,7 @@ private fun NavegacionSesion(usuarioId: String, onCerrarSesion: () -> Unit) {
             HistorialScreen(
                 state = historialUiState,
                 onSeleccionarFiltro = historialViewModel::seleccionarFiltro,
+                onSeleccionarFecha = historialViewModel::seleccionarFecha,
                 onVerDetalle = { registro ->
                     when (registro.ambito) {
                         AmbitoRegistro.ANIMO -> navController.navegarDesde(entrada, Destinos.crearRutaDetalle(registro.id))

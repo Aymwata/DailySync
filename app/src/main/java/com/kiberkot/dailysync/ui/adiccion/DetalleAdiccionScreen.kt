@@ -19,7 +19,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import com.kiberkot.dailysync.R
 import com.kiberkot.dailysync.ui.components.EstadoRegistro
-import com.kiberkot.dailysync.ui.theme.BarrasClarasMarca
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -36,7 +35,6 @@ fun DetalleAdiccionScreen(
     modifier: Modifier = Modifier,
     onReintentar: () -> Unit = {}
 ) {
-    BarrasClarasMarca()
     val disponible = !state.isLoading && !state.cargaFallida && !state.noDisponible
     val accionNombre = state.catalogoAcciones.find {
         it.idAccionProtectora == state.idAccionSeleccionada
@@ -96,10 +94,12 @@ fun DetalleAdiccionScreen(
                 Image(painterResource(R.drawable.ic_module_adiccion), null, Modifier.size(48.dp))
             }
 
-            TarjetaDetalleBrand(titulo = "Nivel de Impulso / Craving", valor = "${state.nivelImpulso} / 10")
+            if (state.editado) Text("Editado", color = DailySyncBrand.Teal, fontWeight = FontWeight.SemiBold)
+            TarjetaDetalleBrand(titulo = "Objetivo de prueba", valor = state.objetivoPersonal)
+            TarjetaDetalleBrand(titulo = "Nivel de Impulso / Craving", valor = com.kiberkot.dailysync.model.textoIntensidad(state.nivelImpulso, state.versionEscala, 10))
             TarjetaDetalleBrand(titulo = "Desencadenante / Gatillo", valor = state.desencadenante.ifBlank { "Sin especificar" })
             TarjetaDetalleBrand(titulo = "Fecha y Hora del Registro", valor = state.fechaHora.ifBlank { "Fecha reciente" })
-            TarjetaDetalleBrand(titulo = "Acción Protectora Aplicada", valor = accionNombre)
+            TarjetaDetalleBrand(titulo = "Acción Protectora Aplicada", valor = if (state.idAccionSeleccionada == 5) state.otraAccion else accionNombre)
             TarjetaDetalleBrand(titulo = "Cumplimiento de Objetivo", valor = state.estadoObjetivo)
 
             Button(

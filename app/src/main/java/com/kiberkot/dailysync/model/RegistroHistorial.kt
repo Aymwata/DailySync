@@ -8,5 +8,7 @@ data class RegistroHistorial(
     val descripcion: String,
     val fechaHora: String,
     val intensidad: Int,
-    val pendienteSync: Boolean = true
+    val pendienteSync: Boolean = true,
+    val versionEscala: Int = 2,
+    val editado: Boolean = false
 )

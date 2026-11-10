@@ -1,5 +1,6 @@
 package com.kiberkot.dailysync.ui.login
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -32,13 +33,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.kiberkot.dailysync.ui.theme.BarrasClarasMarca
 import com.kiberkot.dailysync.R
 import com.kiberkot.dailysync.ui.components.DailySyncLogo
 import com.kiberkot.dailysync.ui.theme.DailySyncBrand as Brand
 import com.kiberkot.dailysync.ui.theme.DailySyncTheme
 import com.kiberkot.dailysync.viewmodel.RegisterUiState
 
+@SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun RegisterScreen(
     state: RegisterUiState,
@@ -61,7 +62,6 @@ fun RegisterScreen(
         }
     }
     val siguiente = KeyboardActions(onNext = { focus.moveFocus(FocusDirection.Down) })
-    BarrasClarasMarca()
     Box(modifier.fillMaxSize().background(Brand.Background)) {
         FondoAcceso(Modifier.matchParentSize())
         BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {

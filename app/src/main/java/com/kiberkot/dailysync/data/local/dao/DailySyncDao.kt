@@ -6,6 +6,23 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface DailySyncDao {
+    @Query("SELECT * FROM USUARIO_PRUEBA WHERE id_usuario = :usuarioId LIMIT 1")
+    fun observarUsuario(usuarioId: String): Flow<UsuarioPruebaEntity?>
+
+    @Query("SELECT * FROM USUARIO_PRUEBA WHERE recordatorio_activo = 1")
+    suspend fun usuariosConRecordatorio(): List<UsuarioPruebaEntity>
+
+    @Query("UPDATE USUARIO_PRUEBA SET recordatorio_activo = :activo, hora_recordatorio = :hora WHERE id_usuario = :usuarioId")
+    suspend fun configurarRecordatorio(usuarioId: String, activo: Boolean, hora: String): Int
+
+    @Query("""SELECT EXISTS (
+        SELECT 1 FROM REGISTRO_ANIMO WHERE id_usuario = :usuarioId AND fecha_hora >= :desde AND fecha_hora < :hasta
+        UNION ALL SELECT 1 FROM REGISTRO_DBT WHERE id_usuario = :usuarioId AND fecha_hora >= :desde AND fecha_hora < :hasta
+        UNION ALL SELECT 1 FROM REGISTRO_NEURO WHERE id_usuario = :usuarioId AND fecha_hora >= :desde AND fecha_hora < :hasta
+        UNION ALL SELECT 1 FROM REGISTRO_ADICCION WHERE id_usuario = :usuarioId AND fecha_hora >= :desde AND fecha_hora < :hasta
+    )""")
+    suspend fun tieneRegistroEnPeriodo(usuarioId: String, desde: String, hasta: String): Boolean
+
     @Query("""
         SELECT fecha, COUNT(*) AS cantidad FROM (
             SELECT substr(fecha_hora, 1, 10) AS fecha FROM REGISTRO_ANIMO
@@ -27,23 +44,23 @@ interface DailySyncDao {
     fun observarRegistroAnimo(id: String, usuarioId: String): Flow<RegistroAnimoEntity?>
 
     @Query("""UPDATE REGISTRO_ANIMO SET id_categoria = :categoriaId,
-        contexto = :contexto, nota_opcional = :nota, nivel_intensidad = :intensidad, pendiente_sync = 1
+        contexto = :contexto, nota_opcional = :nota, nivel_intensidad = :intensidad, pendiente_sync = 1, editado = 1, version_escala = 2
         WHERE id_registro = :id AND id_usuario = :usuarioId""")
     suspend fun actualizarAnimoDelUsuario(id: String, usuarioId: String, categoriaId: Int,
         contexto: String, nota: String?, intensidad: Int): Int
 
     @Query("""UPDATE REGISTRO_NEURO SET id_estrategia = :estrategiaId,
         tipo_actividad = :actividad, nivel_sobrecarga = :sobrecarga, contexto = :contexto,
-        resultado_percibido = :resultado, pendiente_sync = 1
+        resultado_percibido = :resultado, pendiente_sync = 1, editado = 1, version_escala = 2
         WHERE id_registro = :id AND id_usuario = :usuarioId""")
     suspend fun actualizarNeuroDelUsuario(id: String, usuarioId: String, estrategiaId: Int,
         actividad: String, sobrecarga: Int, contexto: String, resultado: Int): Int
 
     @Query("""UPDATE REGISTRO_ADICCION SET id_accion_protectora = :accionId,
-        nivel_impulso = :impulso, desencadenante = :desencadenante, estado_objetivo = :objetivo,
-        pendiente_sync = 1 WHERE id_registro = :id AND id_usuario = :usuarioId""")
+        nivel_impulso = :impulso, desencadenante = :desencadenante, estado_objetivo = :objetivo, otra_accion = :otraAccion,
+        pendiente_sync = 1, editado = 1, version_escala = 2 WHERE id_registro = :id AND id_usuario = :usuarioId""")
     suspend fun actualizarAdiccionDelUsuario(id: String, usuarioId: String, accionId: Int,
-        impulso: Int, desencadenante: String, objetivo: String): Int
+        impulso: Int, desencadenante: String, objetivo: String, otraAccion: String? = null): Int
 
     // --- CONSULTAS Y ACTUALIZACIÓN NEURODESARROLLO ---
     @Query("SELECT * FROM REGISTRO_NEURO WHERE id_registro = :id AND id_usuario = :usuarioId LIMIT 1")
@@ -134,7 +151,7 @@ interface DailySyncDao {
     @Query("""
         UPDATE REGISTRO_DBT SET id_habilidad = :habilidadId,
             situacion_asociada = :situacion, nivel_intensidad = :intensidad,
-            utilidad_percibida = :utilidad, pendiente_sync = 1
+            utilidad_percibida = :utilidad, pendiente_sync = 1, editado = 1, version_escala = 2
         WHERE id_registro = :id AND id_usuario = :usuarioId
     """)
     suspend fun actualizarPracticaDbt(

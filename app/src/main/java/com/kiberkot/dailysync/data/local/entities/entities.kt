@@ -15,7 +15,9 @@ data class UsuarioPruebaEntity(
     @ColumnInfo(name = "password") val password: String = "", // <--- Campo agregado
     @ColumnInfo(name = "token_sesion") val tokenSesion: String? = null,
     @ColumnInfo(name = "recordatorio_activo") val recordatorioActivo: Boolean = false,
-    @ColumnInfo(name = "hora_recordatorio") val horaRecordatorio: String? = null
+    @ColumnInfo(name = "hora_recordatorio") val horaRecordatorio: String? = null,
+    @ColumnInfo(name = "objetivo_adiccion", defaultValue = "'Aplicar una acción protectora ante un impulso'")
+    val objetivoAdiccion: String = "Aplicar una acción protectora ante un impulso"
 )
 // --- MÓDULO ESTADO DE ÁNIMO ---
 // 2. CATALOGO_ANIMO
@@ -55,7 +57,9 @@ data class RegistroAnimoEntity(
     @ColumnInfo(name = "nivel_intensidad") val nivelIntensidad: Int,
     @ColumnInfo(name = "contexto") val contexto: String,
     @ColumnInfo(name = "nota_opcional") val notaOpcional: String? = null,
-    @ColumnInfo(name = "pendiente_sync") val pendienteSync: Boolean = true
+    @ColumnInfo(name = "pendiente_sync") val pendienteSync: Boolean = true,
+    @ColumnInfo(name = "version_escala", defaultValue = "1") val versionEscala: Int = 2,
+    @ColumnInfo(name = "editado", defaultValue = "0") val editado: Boolean = false
 )
 
 // --- MÓDULO HABILIDADES DBT ---
@@ -98,7 +102,9 @@ data class RegistroDbtEntity(
     @ColumnInfo(name = "situacion_asociada") val situacionAsociada: String,
     @ColumnInfo(name = "nivel_intensidad") val nivelIntensidad: Int,
     @ColumnInfo(name = "utilidad_percibida") val utilidadPercibida: Int,
-    @ColumnInfo(name = "pendiente_sync") val pendienteSync: Boolean = true
+    @ColumnInfo(name = "pendiente_sync") val pendienteSync: Boolean = true,
+    @ColumnInfo(name = "version_escala", defaultValue = "1") val versionEscala: Int = 2,
+    @ColumnInfo(name = "editado", defaultValue = "0") val editado: Boolean = false
 )
 
 // --- MÓDULO NEURODESARROLLO ---
@@ -140,7 +146,9 @@ data class RegistroNeuroEntity(
     @ColumnInfo(name = "nivel_sobrecarga") val nivelSobrecarga: Int,
     @ColumnInfo(name = "contexto") val contexto: String,
     @ColumnInfo(name = "resultado_percibido") val resultadoPercibido: Int,
-    @ColumnInfo(name = "pendiente_sync") val pendienteSync: Boolean = true
+    @ColumnInfo(name = "pendiente_sync") val pendienteSync: Boolean = true,
+    @ColumnInfo(name = "version_escala", defaultValue = "1") val versionEscala: Int = 2,
+    @ColumnInfo(name = "editado", defaultValue = "0") val editado: Boolean = false
 )
 
 // --- MÓDULO ADICCIONES ---
@@ -181,5 +189,8 @@ data class RegistroAdiccionEntity(
     @ColumnInfo(name = "nivel_impulso") val nivelImpulso: Int,
     @ColumnInfo(name = "desencadenante") val desencadenante: String,
     @ColumnInfo(name = "estado_objetivo") val estadoObjetivo: String,
-    @ColumnInfo(name = "pendiente_sync") val pendienteSync: Boolean = true
+    @ColumnInfo(name = "otra_accion") val otraAccion: String? = null,
+    @ColumnInfo(name = "pendiente_sync") val pendienteSync: Boolean = true,
+    @ColumnInfo(name = "version_escala", defaultValue = "1") val versionEscala: Int = 2,
+    @ColumnInfo(name = "editado", defaultValue = "0") val editado: Boolean = false
 )

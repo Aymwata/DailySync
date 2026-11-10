@@ -17,12 +17,14 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 data class NeuroUiState(
+    val versionEscala: Int = 2,
+    val editado: Boolean = false,
     val catalogoEstrategias: List<CatalogoNeuroEntity> = emptyList(),
     val idRegistroExistente: String? = null,
     val editando: Boolean = false,
     val idEstrategiaSeleccionada: Int? = null,
     val tipoActividad: String = "",
-    val nivelSobrecarga: Int = 3,
+    val nivelSobrecarga: Int = 2,
     val contexto: String = "",
     val resultadoPercibido: Int = 3,
     val fechaHora: String = "",
@@ -59,7 +61,9 @@ class NeuroViewModel @JvmOverloads constructor(
                     .collect { (catalogo, registro) ->
                         _uiState.update { actual ->
                             val base = if ((!inicializado || soloLectura) && registro != null) actual.copy(
-                                idRegistroExistente = registro.idRegistro, tipoActividad = registro.tipoActividad, nivelSobrecarga = registro.nivelSobrecarga,
+                                idRegistroExistente = registro.idRegistro, tipoActividad = registro.tipoActividad,
+                                versionEscala = registro.versionEscala, editado = registro.editado,
+                                nivelSobrecarga = if (!soloLectura && registro.versionEscala == 1) -1 else registro.nivelSobrecarga,
                                 idEstrategiaSeleccionada = registro.idEstrategia, contexto = registro.contexto,
                                 resultadoPercibido = registro.resultadoPercibido,
                                 fechaHora = registro.fechaHora
@@ -105,7 +109,7 @@ class NeuroViewModel @JvmOverloads constructor(
         if (usuarioId != clave.first || state.isLoading || state.guardando || state.guardadoExitoso || state.noDisponible || state.cargaFallida) return
         val error = if (state.tipoActividad.trim().isEmpty()) "Especifica el tipo de actividad o rutina."
             else if (state.idEstrategiaSeleccionada !in state.catalogoEstrategias.map { it.idEstrategia }) "Selecciona una estrategia del catálogo."
-            else if (state.nivelSobrecarga !in 1..5 || state.resultadoPercibido !in 1..5) "Las escalas deben estar entre 1 y 5."
+            else if (state.nivelSobrecarga !in 0..4 || state.resultadoPercibido !in 1..5) "Selecciona una sobrecarga de 0 a 4 y un resultado de 1 a 5."
             else null
         if (error != null) {
             _uiState.update { it.copy(errorMsg = error) }
@@ -130,8 +134,7 @@ class NeuroViewModel @JvmOverloads constructor(
                 _uiState.update { it.copy(guardando = false, errorMsg = "No se pudo guardar el registro. Intenta nuevamente.") }
                 return@launch
             }
-            notificationHelper.mostrarNotificacionCheckIn("DailySync",
-                if (state.editando) "Registro actualizado." else "Nuevo registro guardado localmente.")
+            notificationHelper.cancelarSiRegistroDeHoy(usuarioId, state.fechaHora.takeIf { state.editando })
             _uiState.update { it.copy(guardando = false, guardadoExitoso = true) }
         }
     }

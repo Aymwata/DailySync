@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kiberkot.dailysync.R
 import com.kiberkot.dailysync.model.HabilidadDbt
-import com.kiberkot.dailysync.ui.theme.BarrasClarasMarca
 import com.kiberkot.dailysync.ui.theme.DailySyncBrand as Brand
 
 internal val DbtPurple = Color(0xFF795B9D)
@@ -82,7 +81,6 @@ internal fun DbtPagina(
     modifier: Modifier = Modifier,
     contenido: LazyListScope.() -> Unit
 ) {
-    BarrasClarasMarca()
     Scaffold(modifier = modifier.fillMaxSize().imePadding(), containerColor = Color(0xFFF7F9F8),
         contentColor = Brand.Ink, topBar = {
             Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp),
@@ -129,11 +127,13 @@ internal fun DbtPaso(numero: String, titulo: String) {
 
 @Composable
 internal fun DbtAccion(texto: String, onClick: () -> Unit, enabled: Boolean = true,
-    guardando: Boolean = false, error: String? = null) {
+    guardando: Boolean = false, error: String? = null,
+    registroRapido: com.kiberkot.dailysync.ui.components.RegistroRapidoConfig? = null) {
     Surface(shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp), color = Color.White,
         border = BorderStroke(1.dp, Brand.Border)) {
         Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            com.kiberkot.dailysync.ui.components.ControlesRegistroRapido(registroRapido, enabled)
             error?.let { DbtMensajeError(it) }
             val forma = RoundedCornerShape(18.dp)
             Button(onClick, enabled = enabled, shape = forma,

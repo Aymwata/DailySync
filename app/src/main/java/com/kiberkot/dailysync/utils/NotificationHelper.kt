@@ -3,74 +3,86 @@ package com.kiberkot.dailysync.utils
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import com.kiberkot.dailysync.MainActivity
+import com.kiberkot.dailysync.R
+import com.kiberkot.dailysync.reminders.AvisosRecordatorio
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
-class NotificationHelper(private val context: Context) {
-
-    private val channelId = "dailysync_checkin_channel"
-
-    init {
-        try { crearCanalNotificacion() } catch (e: Exception) {
-            android.util.Log.w("DailySync", "No se pudo crear el canal de notificaciones", e)
-        }
+class NotificationHelper(private val context: Context) : AvisosRecordatorio {
+    companion object {
+        const val CHANNEL_ID = "dailysync_recordatorio_diario"
+        private const val AVISO_ID = 1
     }
+    private val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-    private fun crearCanalNotificacion() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val name = "Confirmaciones DailySync"
-            val descriptionText = "Avisos discretos de registros guardados localmente (RF06)"
-            val importance = NotificationManager.IMPORTANCE_DEFAULT
-            val channel = NotificationChannel(channelId, name, importance).apply {
-                description = descriptionText
-                lockscreenVisibility = NotificationCompat.VISIBILITY_PRIVATE
+    fun eliminarCanalAnterior() {
+        if (Build.VERSION.SDK_INT >= 26) manager.deleteNotificationChannel("dailysync_checkin_channel")
+        else {
+            val control = context.getSharedPreferences("notificaciones_locales", Context.MODE_PRIVATE)
+            if (!control.getBoolean("confirmaciones_retiradas", false)) {
+                manager.cancelAll()
+                control.edit().putBoolean("confirmaciones_retiradas", true).apply()
             }
-            val notificationManager =
-                context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(channel)
         }
     }
 
-    fun mostrarNotificacionCheckIn(titulo: String, mensaje: String) {
-        try {
-            publicarNotificacion(titulo, mensaje)
-        } catch (e: Exception) {
-            android.util.Log.w("DailySync", "El registro se guardó, pero no se pudo notificar", e)
+    fun prepararCanal() {
+        if (Build.VERSION.SDK_INT >= 26) {
+            manager.createNotificationChannel(NotificationChannel(CHANNEL_ID, "Recordatorio diario",
+                NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = "Aviso discreto para el registro diario"
+                lockscreenVisibility = NotificationCompat.VISIBILITY_PRIVATE
+            })
         }
     }
 
-    private fun publicarNotificacion(titulo: String, mensaje: String) {
-        // Verificar permiso explícito en Android 13+ (API 33+)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val tienePermiso = ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED
-            if (!tienePermiso) return
-        }
+    fun permitidas(): Boolean {
+        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context,
+                Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return false
+        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return false
+        if (Build.VERSION.SDK_INT >= 26 && manager.getNotificationChannel(CHANNEL_ID)?.importance == NotificationManager.IMPORTANCE_NONE) return false
+        return true
+    }
 
-        // Versión neutra para pantalla bloqueada (Cumplimiento RF06)
-        val notificacionPublica = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("DailySync")
-            .setContentText("Actividad personal actualizada")
-            .build()
+    override fun publicarRecordatorio(usuarioId: String): Boolean {
+        prepararCanal()
+        if (!permitidas()) return false
+        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context,
+                Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return false
+        val abrir = Intent(context, MainActivity::class.java)
+            .setData(Uri.Builder().scheme("dailysync").authority("aviso").appendPath(usuarioId).build())
+            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        val pendiente = PendingIntent.getActivity(context, 0, abrir,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val publica = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_launcher_monochrome).setContentTitle("DailySync")
+            .setContentText("Aún estas a tiempo para tu registro diario! Ingresa para continuar.").build()
+        val aviso = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_launcher_monochrome).setContentTitle("DailySync")
+            .setContentText("Tienes un nuevo recordatorio.")
+            .setCategory(NotificationCompat.CATEGORY_REMINDER).setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE).setPublicVersion(publica)
+            .setContentIntent(pendiente).setOnlyAlertOnce(true).setAutoCancel(true).build()
+        manager.notify(usuarioId, AVISO_ID, aviso)
+        return true
+    }
 
-        val builder = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle(titulo)
-            .setContentText(mensaje)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
-            .setPublicVersion(notificacionPublica)
-            .setAutoCancel(true)
+    override fun cancelarRecordatorio(usuarioId: String) { manager.cancel(usuarioId, AVISO_ID) }
 
-        val notificationManager =
-            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-        notificationManager.notify(System.currentTimeMillis().toInt(), builder.build())
+    /** Guardar nunca publica avisos; sólo retira un recordatorio que ya fue atendido hoy. */
+    fun cancelarSiRegistroDeHoy(usuarioId: String, fechaOriginal: String? = null) {
+        val hoy = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date())
+        if (fechaOriginal == null || fechaOriginal.startsWith(hoy)) cancelarRecordatorio(usuarioId)
     }
 }

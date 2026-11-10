@@ -132,7 +132,7 @@ class RegisterViewModel @JvmOverloads constructor(
                     correo = correoBuscado,
                     password = state.password.trim(),
                     tokenSesion = "token_${System.currentTimeMillis()}",
-                    recordatorioActivo = true,
+                    recordatorioActivo = false,
                     horaRecordatorio = "20:00"
                 )
                 dao.insertarUsuario(nuevoUsuario)

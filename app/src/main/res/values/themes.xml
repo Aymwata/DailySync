@@ -2,6 +2,11 @@
 <resources>
 
     <style name="Theme.DailySync" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="DialogoHoraMarca" parent="android:Theme.Material.Light.Dialog.Alert">
+        <item name="android:colorAccent">#009C91</item>
+        <item name="android:textColorPrimary">#163F3B</item>
+        <item name="android:textColorSecondary">#567B75</item>
+    </style>
     <style name="Theme.DailySync.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">#F0FBF8</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>

@@ -10,13 +10,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kiberkot.dailysync.ui.components.DailySyncLogo
-import com.kiberkot.dailysync.ui.theme.BarrasClarasMarca
 import com.kiberkot.dailysync.ui.theme.DailySyncBrand as Brand
 
 /** Respaldo del splash para las composiciones fuera de la actividad y los fallos recuperables. */
 @Composable
 internal fun InicioSesionScreen(error: String?, onReintentar: () -> Unit) {
-    BarrasClarasMarca()
     Column(Modifier.fillMaxSize().background(Brand.Background).systemBarsPadding().padding(28.dp),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         DailySyncLogo(Modifier.size(80.dp))

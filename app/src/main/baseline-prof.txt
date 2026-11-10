@@ -1,0 +1,9 @@
+# App-owned paths used in the demonstration. Library profiles are merged by AGP.
+# Keep startup rules narrow; forms, details and history are post-startup hot paths.
+# Syntax: https://developer.android.com/topic/performance/baselineprofiles/manually-create-measure
+Lcom/kiberkot/dailysync/MainActivity;
+Lcom/kiberkot/dailysync/navigation/AppNavigationKt;
+HSPLcom/kiberkot/dailysync/MainActivity;->**(**)**
+HPLcom/kiberkot/dailysync/navigation/**->**(**)**
+HPLcom/kiberkot/dailysync/ui/**->**(**)**
+HPLcom/kiberkot/dailysync/viewmodel/**->**(**)**

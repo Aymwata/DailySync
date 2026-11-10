@@ -31,7 +31,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kiberkot.dailysync.R
 import com.kiberkot.dailysync.ui.components.DailySyncLogo
-import com.kiberkot.dailysync.ui.theme.BarrasClarasMarca
 import com.kiberkot.dailysync.ui.theme.DailySyncBrand as Brand
 import com.kiberkot.dailysync.ui.theme.DailySyncTheme
 import com.kiberkot.dailysync.viewmodel.ActividadDiaUi
@@ -63,15 +62,16 @@ fun HomeScreen(
     onAbrirSeccion: (SeccionHome) -> Unit,
     onReintentar: () -> Unit = {},
     onCerrarSesion: () -> Unit = {},
-    modifier: Modifier = Modifier
+    onMisDatos: () -> Unit = {},
+    modifier: Modifier = Modifier,
+    onRegistroRapido: () -> Unit = {},
+    onNotificaciones: () -> Unit = {}
 ) {
-    var mostrarSelector by rememberSaveable { mutableStateOf(false) }
-    BarrasClarasMarca()
     Box(modifier.fillMaxSize().background(Brush.verticalGradient(
         listOf(Color(0xFFF0F9F5), Color(0xFFF8FAF8))))) {
         Scaffold(
             containerColor = Color.Transparent,
-            topBar = { CabeceraHome(state.iniciales, onCerrarSesion) },
+            topBar = { CabeceraHome(state, onCerrarSesion, onMisDatos, onNotificaciones) },
             bottomBar = { BarraInferiorHome(onAbrirSeccion) }
         ) { innerPadding ->
             // Son pocas secciones fijas: mantenerlas compuestas evita recrear
@@ -99,7 +99,7 @@ fun HomeScreen(
 
                 val shape = RoundedCornerShape(20.dp)
                 Button(
-                    onClick = { mostrarSelector = true }, shape = shape,
+                    onClick = onRegistroRapido, shape = shape,
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.White),
                     contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
                     modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)
@@ -109,7 +109,7 @@ fun HomeScreen(
                 ) {
                     Icon(painterResource(R.drawable.ic_home_plus), contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(10.dp))
-                    Text("Nuevo registro", style = estiloHome(16, FontWeight.SemiBold))
+                    Text("Registro rápido", style = estiloHome(16, FontWeight.SemiBold))
                 }
 
                 Text("Ámbitos de autorreporte", style = estiloHome(17, FontWeight.SemiBold), color = Brand.Ink)
@@ -125,44 +125,25 @@ fun HomeScreen(
 
             }
         }
-        if (mostrarSelector) {
-            ModalBottomSheet(
-                onDismissRequest = { mostrarSelector = false },
-                containerColor = Color(0xFFF8FBF9), contentColor = Brand.Ink,
-                shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
-                dragHandle = { BottomSheetDefaults.DragHandle(color = Color(0xFFC7DAD1)) }
-            ) {
-                Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("¿Qué quieres registrar?", style = estiloHome(22, FontWeight.SemiBold), color = Brand.Ink)
-                    Text("Elige el espacio que necesitas hoy.", style = estiloHome(14), color = Brand.Muted)
-                    Spacer(Modifier.height(2.dp))
-                    ModuloHome.entries.forEach { modulo ->
-                        val colores = paleta(modulo)
-                        Surface(onClick = {
-                            mostrarSelector = false
-                            onAbrirModulo(modulo)
-                        }, shape = RoundedCornerShape(20.dp), color = colores.fondo,
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 68.dp)) {
-                            Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                                Image(painterResource(colores.icono), contentDescription = null, modifier = Modifier.size(42.dp))
-                                Text(modulo.titulo, style = estiloHome(15, FontWeight.SemiBold), color = colores.acento,
-                                    modifier = Modifier.weight(1f))
-                                Icon(painterResource(R.drawable.ic_home_arrow), contentDescription = null,
-                                    tint = colores.acento, modifier = Modifier.size(18.dp))
-                            }
-                        }
-                    }
-                }
-            }
-        }
     }
 }
 
 @Composable
-private fun CabeceraHome(iniciales: String, onCerrarSesion: () -> Unit) {
+private fun CabeceraHome(state: HomeUiState, onCerrarSesion: () -> Unit, onMisDatos: () -> Unit, onNotificaciones: () -> Unit) {
+    val iniciales = state.iniciales
+    val registradoHoy = state.actividadSemanal.any { it.esHoy && it.cantidad > 0 }
+    val estadoDiario = when {
+        state.error != null -> "Sin datos"
+        !state.actividadCargada -> "Cargando"
+        registradoHoy -> "Registrado"
+        else -> "Sin registro"
+    }
+    val descripcionDiaria = when {
+        state.error != null -> "No se pudo consultar la actividad de hoy"
+        !state.actividadCargada -> "Consultando la actividad de hoy"
+        registradoHoy -> "Ya tienes al menos un registro hoy"
+        else -> "Aún no tienes registros hoy"
+    }
     var mostrarPerfil by remember { mutableStateOf(false) }
     Surface(color = Color(0xFFF5FBF8)) {
         Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp),
@@ -173,12 +154,15 @@ private fun CabeceraHome(iniciales: String, onCerrarSesion: () -> Unit) {
                 Text("Tu espacio diario", style = estiloHome(12), color = Brand.Muted)
             }
             Surface(shape = RoundedCornerShape(50), color = Color(0xFFE5F3EB),
-                modifier = Modifier.clearAndSetSemantics { contentDescription = "Registros guardados en este dispositivo" }) {
+                modifier = Modifier.testTag("home_estado_diario").clearAndSetSemantics {
+                    contentDescription = descripcionDiaria
+                    liveRegion = LiveRegionMode.Polite
+                }) {
                 Row(Modifier.padding(horizontal = 9.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Icon(painterResource(R.drawable.ic_home_check), contentDescription = null, tint = Color(0xFF4D866E),
+                    Icon(painterResource(if (registradoHoy) R.drawable.ic_home_check else R.drawable.ic_form_note), contentDescription = null, tint = Color(0xFF4D866E),
                         modifier = Modifier.size(12.dp))
-                    Text("Local", style = estiloHome(12, FontWeight.Medium), color = Color(0xFF4D7865))
+                    Text(estadoDiario, style = estiloHome(12, FontWeight.Medium), color = Color(0xFF4D7865))
                 }
             }
             Box {
@@ -203,6 +187,14 @@ private fun CabeceraHome(iniciales: String, onCerrarSesion: () -> Unit) {
                         Text("Tu espacio personal", style = estiloHome(12), color = Brand.Muted)
                     }
                     HorizontalDivider(Modifier.padding(horizontal = 12.dp), color = Brand.Border)
+                    DropdownMenuItem(
+                        text = { Text("Mis datos", style = estiloHome(14, FontWeight.Medium), color = Brand.Ink) },
+                        onClick = { mostrarPerfil = false; onMisDatos() }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Notificaciones", style = estiloHome(14, FontWeight.Medium), color = Brand.Ink) },
+                        onClick = { mostrarPerfil = false; onNotificaciones() }
+                    )
                     DropdownMenuItem(
                         text = { Text("Cerrar sesión", style = estiloHome(14, FontWeight.Medium), color = Brand.Error) },
                         leadingIcon = {

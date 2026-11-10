@@ -31,7 +31,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.kiberkot.dailysync.ui.theme.BarrasClarasMarca
 import com.kiberkot.dailysync.R
 import com.kiberkot.dailysync.ui.components.DailySyncLogo
 import com.kiberkot.dailysync.ui.theme.DailySyncBrand as Brand
@@ -59,7 +58,6 @@ fun LoginScreen(
             onIniciarSesion()
         }
     }
-    BarrasClarasMarca()
     Box(modifier.fillMaxSize().background(Brand.Background)) {
         FondoAcceso(Modifier.matchParentSize())
         BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
@@ -94,6 +92,11 @@ fun LoginScreen(
                 ) {
                     Column(Modifier.padding(24.dp)) {
                         TextoAcceso("Qué gusto verte", 18, Brand.Ink, FontWeight.SemiBold)
+                        state.avisoSesion?.let {
+                            Spacer(Modifier.height(12.dp))
+                            TextoAcceso(it, 12, Brand.Muted,
+                                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+                        }
                         Spacer(Modifier.height(22.dp))
                         CampoAcceso(
                             etiqueta = "ID o Correo electrónico", valor = state.usuarioOrEmail,

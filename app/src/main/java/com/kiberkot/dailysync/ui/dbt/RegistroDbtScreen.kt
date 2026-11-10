@@ -31,7 +31,8 @@ fun RegistroDbtScreen(
     state: RegistroDbtUiState, editando: Boolean,
     onSeleccionarHabilidad: (Int) -> Unit, onCambioSituacion: (String) -> Unit,
     onCambioIntensidad: (Int) -> Unit, onCambioUtilidad: (Int) -> Unit,
-    onGuardar: () -> Unit, onReintentar: () -> Unit, onVolver: () -> Unit
+    onGuardar: () -> Unit, onReintentar: () -> Unit, onVolver: () -> Unit,
+    registroRapido: com.kiberkot.dailysync.ui.components.RegistroRapidoConfig? = null
 ) {
     BackHandler(enabled = state.procesando) { }
     val lista = rememberLazyListState()
@@ -63,7 +64,8 @@ fun RegistroDbtScreen(
                 editando -> "Guardar cambios"
                 else -> "Guardar práctica"
             }, onClick = { intento++; teclado?.hide(); foco.clearFocus(); onGuardar() },
-            enabled = !state.procesando, guardando = state.procesando, error = state.error)
+            enabled = !state.procesando, guardando = state.procesando, error = state.error, registroRapido = registroRapido)
+        else com.kiberkot.dailysync.ui.components.PieRegistroRapido(registroRapido)
     }) {
         if (!disponible) item { DbtEstado(state.cargando, state.error, onReintentar) }
         else {
@@ -122,7 +124,7 @@ fun RegistroDbtScreen(
                     DbtPaso("2", "Situación o emoción")
                     DbtTarjeta {
                         Text("¿Qué estaba pasando?", style = textoDbt(15, FontWeight.SemiBold))
-                        OutlinedTextField(value = state.formulario.situacion, onValueChange = onCambioSituacion,
+                        OutlinedTextField(value = state.formulario.situacion, onValueChange = com.kiberkot.dailysync.ui.components.conActividadSesion(onCambioSituacion),
                             enabled = !state.procesando, minLines = 3, maxLines = 6, textStyle = textoDbt(16),
                             placeholder = { Text("Ej. Quería responder de inmediato a un mensaje", style = textoDbt(14), color = Brand.Muted) },
                             shape = RoundedCornerShape(18.dp), isError = "situacion" in state.errores,
@@ -143,8 +145,10 @@ fun RegistroDbtScreen(
                 }
             }
             item {
+                if (state.registro?.versionEscala == 1) Text(com.kiberkot.dailysync.model.AVISO_ESCALA_ANTERIOR,
+                    style = textoDbt(13), color = Brand.Muted)
                 DbtEscala("3", "Intensidad de la emoción", "¿Cuánto la sentiste?", state.formulario.intensidad,
-                    "Suave", "Muy intensa", Color(0xFFFAEEE5), Color(0xFF95613F), "intensidad", !state.procesando,
+                    "Sin síntomas", "Severa", Color(0xFFFAEEE5), Color(0xFF95613F), "intensidad", !state.procesando,
                     state.errores["intensidad"], onCambioIntensidad)
             }
             item {
@@ -164,15 +168,17 @@ internal fun DbtEscala(numero: String, titulo: String, pregunta: String, valor: 
         DbtPaso(numero, titulo)
         DbtTarjeta {
             Text(pregunta, style = textoDbt(14), color = Brand.Muted)
+            if (tag == "intensidad") Text(com.kiberkot.dailysync.model.etiquetaIntensidad(valor),
+                style = textoDbt(14, FontWeight.SemiBold), color = acento)
             Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                (1..5).forEach { nivel ->
+                (if (tag == "intensidad") 0..4 else 1..5).forEach { nivel ->
                     val selected = valor == nivel
                     Surface(shape = RoundedCornerShape(14.dp), color = if (selected) acento else fondo,
                         modifier = Modifier.weight(1f).heightIn(min = 48.dp)
                             .selectable(selected, enabled = enabled, role = Role.RadioButton, onClick = { onChange(nivel) })
                             .testTag("dbt_${tag}_$nivel")) {
                         Box(Modifier.padding(vertical = 10.dp).clearAndSetSemantics {
-                            contentDescription = "$titulo: $nivel de 5"
+                            contentDescription = if (tag == "intensidad") "$titulo: $nivel de 4: ${com.kiberkot.dailysync.model.etiquetaIntensidad(nivel)}" else "$titulo: $nivel de 5"
                         }, contentAlignment = Alignment.Center) {
                             Text("$nivel", style = textoDbt(18, FontWeight.SemiBold), color = if (selected) Color.White else acento)
                         }

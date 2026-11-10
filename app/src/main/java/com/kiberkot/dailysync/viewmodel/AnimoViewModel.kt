@@ -33,10 +33,11 @@ private val CATALOGO_ANIMO_DEFAULT = listOf(
 )
 
 data class AnimoUiState(
+    val versionEscala: Int = 2,
     val categorias: List<CategoriaAnimo> = CATALOGO_ANIMO_DEFAULT,
     val historial: List<RegistroAnimo> = emptyList(),
     val categoriaSeleccionada: CategoriaAnimo? = null,
-    val nivelIntensidad: Float = 3f,
+    val nivelIntensidad: Float = 2f,
     val contexto: String = "",
     val notaOpcional: String = "",
     val errorCategoria: String? = null,
@@ -79,13 +80,13 @@ class AnimoViewModel @JvmOverloads constructor(
                     val modelo = entidad?.let {
                         RegistroAnimo(it.idRegistro, it.idUsuario, it.idCategoria,
                             categorias.find { c -> c.id == it.idCategoria }?.nombre ?: "Estado de ánimo",
-                            it.fechaHora, it.nivelIntensidad, it.contexto, it.notaOpcional, it.pendienteSync)
+                            it.fechaHora, it.nivelIntensidad, it.contexto, it.notaOpcional, it.pendienteSync, it.versionEscala, it.editado)
                     }
                     _uiState.update { actual ->
                         val base = if (!inicializado && entidad != null) actual.copy(
-                            idRegistroExistente = entidad.idRegistro,
+                            idRegistroExistente = entidad.idRegistro, versionEscala = entidad.versionEscala,
                             categoriaSeleccionada = categorias.find { it.id == entidad.idCategoria },
-                            nivelIntensidad = entidad.nivelIntensidad.toFloat(), contexto = entidad.contexto,
+                            nivelIntensidad = if (entidad.versionEscala == 1) -1f else entidad.nivelIntensidad.toFloat(), contexto = entidad.contexto,
                             notaOpcional = entidad.notaOpcional.orEmpty(), fechaHoraOriginal = entidad.fechaHora
                         ) else actual
                         base.copy(categorias = categorias, historial = listOfNotNull(modelo), cargando = false,
@@ -122,8 +123,8 @@ class AnimoViewModel @JvmOverloads constructor(
         val errorContexto = if (contexto.length !in 3..60) "Escribe entre 3 y 60 caracteres para el contexto." else null
         _uiState.update { it.copy(errorCategoria = errorCategoria, errorContexto = errorContexto, error = null) }
         if (errorCategoria != null || errorContexto != null) return false
-        if (!actual.nivelIntensidad.isFinite() || actual.nivelIntensidad !in 1f..5f) {
-            _uiState.update { it.copy(error = "La intensidad debe estar entre 1 y 5.") }
+        if (!actual.nivelIntensidad.isFinite() || actual.nivelIntensidad !in 0f..4f || actual.nivelIntensidad % 1f != 0f) {
+            _uiState.update { it.copy(error = "Selecciona una intensidad de 0 a 4.") }
             return false
         }
         // Bloquear antes de iniciar la escritura evita que dos pulsaciones creen dos registros.
@@ -145,8 +146,7 @@ class AnimoViewModel @JvmOverloads constructor(
                 _uiState.update { it.copy(guardando = false, error = "No se pudo guardar el registro. Intenta nuevamente.") }
                 return@launch
             }
-            notificationHelper.mostrarNotificacionCheckIn("DailySync",
-                if (actual.editando) "Check-in actualizado." else "Nuevo check-in guardado localmente.")
+            notificationHelper.cancelarSiRegistroDeHoy(clave.first, actual.fechaHoraOriginal.takeIf { actual.editando })
             _uiState.update { it.copy(bannerExitoVisible = true) }
             delay(1000L)
             onExito()

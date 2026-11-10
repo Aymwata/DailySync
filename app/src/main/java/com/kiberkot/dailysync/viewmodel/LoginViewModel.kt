@@ -7,7 +7,9 @@ import kotlinx.coroutines.CancellationException
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.kiberkot.dailysync.data.local.AppDatabase
-import com.kiberkot.dailysync.data.local.SesionPreferencias
+import com.kiberkot.dailysync.data.local.*
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,35 +29,135 @@ data class LoginUiState(
     val usuarioId: String? = null,
     val error: String? = null,
     val restaurandoSesion: Boolean = false,
-    val errorSesion: String? = null
+    val errorSesion: String? = null,
+    val avisoSesion: String? = null
 )
 
 class LoginViewModel @JvmOverloads constructor(
     application: Application,
     private val savedState: SavedStateHandle = SavedStateHandle(),
     private val dao: DailySyncDao = AppDatabase.getDatabase(application).dailySyncDao(),
-    private val sesion: SesionPreferencias = SesionPreferencias(application)
+    private val sesion: SesionPreferencias = SesionPreferencias(application),
+    private val reloj: RelojSesion = RelojSesionSistema(application),
+    private val inactividadMs: Long = INACTIVIDAD_SESION_MS
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(LoginUiState(restaurandoSesion = true))
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
 
-    init { restaurarSesion() }
+    private var ultimaActividad: InstanteActividad? = null
+    private var ultimaPersistencia = 0L
+    private var vigilancia: Job? = null
+    private var revisionOperacion = 0
+    private var cierrePendiente = false
+    private var cierre: Job? = null
+    private var avisoCierre: String? = null
+
+    init { require(inactividadMs > 0); restaurarSesion() }
 
     fun restaurarSesion() {
-        _uiState.update { it.copy(restaurandoSesion = true, errorSesion = null) }
+        if (cierrePendiente) { completarCierre(); return }
+        val revision = ++revisionOperacion
+        vigilancia?.cancel()
+        ultimaActividad = null
+        _uiState.value = LoginUiState(restaurandoSesion = true)
         viewModelScope.launch {
             try {
-                val usuarioId = withContext(Dispatchers.IO) { sesion.obtenerUsuario() }
-                val cuentaValida = usuarioId?.let { dao.obtenerUsuario(it) }?.idUsuario
-                if (usuarioId != null && cuentaValida == null) withContext(Dispatchers.IO) { sesion.borrar() }
-                // El disco es la autoridad: un SavedStateHandle antiguo no puede revivir un logout.
+                val guardada = withContext(Dispatchers.IO) { sesion.obtenerSesion() }
+                if (revision != revisionOperacion) return@launch
+                if (guardada != null && tiempoRestanteSesion(guardada.actividad, reloj.ahora(), inactividadMs) == 0L) {
+                    bloquearSesion(porInactividad = true)
+                    return@launch
+                }
+                val cuentaValida = guardada?.let { dao.obtenerUsuario(it.usuarioId) }?.idUsuario
+                if (guardada != null && cuentaValida == null) withContext(Dispatchers.IO) { sesion.borrar() }
+                if (revision != revisionOperacion) return@launch
+                if (cuentaValida != null && tiempoRestanteSesion(guardada?.actividad, reloj.ahora(), inactividadMs) == 0L) {
+                    bloquearSesion(porInactividad = true)
+                    return@launch
+                }
                 savedState["usuarioId"] = cuentaValida
+                ultimaActividad = guardada?.actividad.takeIf { cuentaValida != null }
+                ultimaPersistencia = ultimaActividad?.transcurridoMs ?: 0
                 _uiState.value = LoginUiState(usuarioId = cuentaValida)
+                if (cuentaValida != null) iniciarVigilancia()
             } catch (e: CancellationException) { throw e
             } catch (e: Exception) {
-                _uiState.update { it.copy(restaurandoSesion = false,
-                    errorSesion = "No se pudo recuperar tu sesión. Intenta nuevamente.") }
+                if (revision == revisionOperacion) _uiState.value = LoginUiState(
+                    errorSesion = "No se pudo recuperar tu sesión. Intenta nuevamente.")
+            }
+        }
+    }
+
+    /** Comprueba sin renovar: se usa antes de mostrar la app al volver del segundo plano. */
+    fun verificarSesion(): Boolean {
+        val state = _uiState.value
+        if (state.usuarioId == null) return !state.restaurandoSesion
+        if (tiempoRestanteSesion(ultimaActividad, reloj.ahora(), inactividadMs) == 0L) {
+            bloquearSesion(porInactividad = true)
+            return false
+        }
+        return true
+    }
+
+    /** Devuelve false si el evento llegó con la sesión vencida; nunca la revive. */
+    fun registrarInteraccion(): Boolean {
+        if (!verificarSesion()) return false
+        val usuario = _uiState.value.usuarioId ?: return true
+        val ahora = reloj.ahora()
+        ultimaActividad = ahora
+        // El movimiento del dedo no debe generar escrituras a 60 Hz.
+        if (ahora.transcurridoMs - ultimaPersistencia >= 1000) {
+            sesion.actualizarActividad(usuario, ahora)
+            ultimaPersistencia = ahora.transcurridoMs
+        }
+        return true
+    }
+
+    fun guardarActividadActual() {
+        if (!verificarSesion()) return
+        val usuario = _uiState.value.usuarioId ?: return
+        ultimaActividad?.let { sesion.actualizarActividad(usuario, it) }
+    }
+
+    private fun iniciarVigilancia() {
+        vigilancia?.cancel()
+        vigilancia = viewModelScope.launch {
+            while (_uiState.value.usuarioId != null) {
+                val restante = tiempoRestanteSesion(ultimaActividad, reloj.ahora(), inactividadMs)
+                if (restante == 0L) { bloquearSesion(porInactividad = true); break }
+                delay(restante)
+            }
+        }
+    }
+
+    private fun bloquearSesion(porInactividad: Boolean) {
+        if (cierrePendiente) return
+        ++revisionOperacion
+        vigilancia?.cancel()
+        ultimaActividad = null
+        savedState["usuarioId"] = null
+        avisoCierre = if (porInactividad) "Tu sesión se cerró por inactividad. Inicia sesión nuevamente." else null
+        cierrePendiente = true
+        // Retira las pantallas privadas antes de esperar la escritura en disco.
+        _uiState.value = LoginUiState(restaurandoSesion = true, isLoading = true, avisoSesion = avisoCierre)
+        runCatching { sesion.revocar() }
+        completarCierre()
+    }
+
+    private fun completarCierre() {
+        if (cierre?.isActive == true) return
+        _uiState.value = LoginUiState(restaurandoSesion = true, isLoading = true, avisoSesion = avisoCierre)
+        cierre = viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { sesion.borrar() }
+                cierrePendiente = false
+                _uiState.value = LoginUiState(avisoSesion = avisoCierre)
+            } catch (e: CancellationException) { throw e
+            } catch (e: Exception) {
+                // Un error al cerrar no vuelve a mostrar contenido privado. Reintentar sólo repite el borrado.
+                _uiState.value = LoginUiState(errorSesion = "No se pudo finalizar el cierre de sesión. Reintenta.",
+                    avisoSesion = avisoCierre)
             }
         }
     }
@@ -110,6 +212,7 @@ class LoginViewModel @JvmOverloads constructor(
         }
 
         _uiState.update { it.copy(isLoading = true, error = null, errorUsuario = null, errorPassword = null) }
+        val revision = ++revisionOperacion
 
         viewModelScope.launch {
             try {
@@ -141,7 +244,11 @@ class LoginViewModel @JvmOverloads constructor(
                 }
 
                 // Autenticación correcta
-                withContext(Dispatchers.IO) { sesion.guardar(usuarioEncontrado.idUsuario) }
+                val actividad = reloj.ahora()
+                withContext(Dispatchers.IO) { sesion.guardar(usuarioEncontrado.idUsuario, actividad) }
+                if (revision != revisionOperacion) return@launch
+                ultimaActividad = actividad
+                ultimaPersistencia = actividad.transcurridoMs
                 savedState["usuarioId"] = usuarioEncontrado.idUsuario
                 _uiState.update {
                     it.copy(
@@ -149,9 +256,11 @@ class LoginViewModel @JvmOverloads constructor(
                         loginExitoso = true,
                         usuarioId = usuarioEncontrado.idUsuario,
                         password = "",
-                        isPasswordVisible = false
+                        isPasswordVisible = false,
+                        avisoSesion = null
                     )
                 }
+                iniciarVigilancia()
             } catch (e: CancellationException) { throw e
             } catch (e: Exception) {
                 _uiState.update { it.copy(isLoading = false, error = "No se pudo iniciar sesión. Intenta nuevamente.") }
@@ -161,17 +270,7 @@ class LoginViewModel @JvmOverloads constructor(
 
     fun cerrarSesion() {
         if (_uiState.value.isLoading || _uiState.value.restaurandoSesion) return
-        _uiState.update { it.copy(isLoading = true, error = null) }
-        viewModelScope.launch {
-            try {
-                withContext(Dispatchers.IO) { sesion.borrar() }
-                savedState["usuarioId"] = null
-                _uiState.value = LoginUiState()
-            } catch (e: CancellationException) { throw e
-            } catch (e: Exception) {
-                _uiState.update { it.copy(isLoading = false, error = "No se pudo cerrar sesión. Intenta nuevamente.") }
-            }
-        }
+        bloquearSesion(porInactividad = false)
     }
 
     fun resetearEstadoLogin() {

@@ -19,7 +19,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import com.kiberkot.dailysync.R
 import com.kiberkot.dailysync.ui.components.EstadoRegistro
-import com.kiberkot.dailysync.ui.theme.BarrasClarasMarca
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -36,7 +35,6 @@ fun DetalleNeuroScreen(
     modifier: Modifier = Modifier,
     onReintentar: () -> Unit = {}
 ) {
-    BarrasClarasMarca()
     val disponible = !state.isLoading && !state.cargaFallida && !state.noDisponible
     val estrategiaNombre = state.catalogoEstrategias.find {
         it.idEstrategia == state.idEstrategiaSeleccionada
@@ -96,9 +94,10 @@ fun DetalleNeuroScreen(
                 Image(painterResource(R.drawable.ic_module_neuro), null, Modifier.size(48.dp))
             }
 
+            if (state.editado) Text("Editado", color = DailySyncBrand.Teal, fontWeight = FontWeight.SemiBold)
             TarjetaDetalleBrand(titulo = "Tipo de Actividad / Tarea", valor = state.tipoActividad.ifBlank { "Sin información" })
             TarjetaDetalleBrand(titulo = "Fecha y Hora del Registro", valor = state.fechaHora.ifBlank { "Fecha reciente" })
-            TarjetaDetalleBrand(titulo = "Nivel de Sobrecarga Sensorial", valor = "${state.nivelSobrecarga} / 5")
+            TarjetaDetalleBrand(titulo = "Nivel de Sobrecarga Sensorial", valor = com.kiberkot.dailysync.model.textoIntensidad(state.nivelSobrecarga, state.versionEscala))
             TarjetaDetalleBrand(titulo = "Estrategia Aplicada", valor = estrategiaNombre)
             TarjetaDetalleBrand(titulo = "Contexto / Entorno", valor = state.contexto.ifBlank { "Sin contexto registrado" })
             TarjetaDetalleBrand(titulo = "Efectividad / Resultado", valor = "${state.resultadoPercibido} / 5")

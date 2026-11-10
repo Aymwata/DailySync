@@ -16,14 +16,23 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
+val DESENCADENANTES_ADICCION = listOf("Estrés", "Conflicto interpersonal", "Entorno asociado al consumo", "Aburrimiento", "Otro (especificar)")
+val ESTADOS_OBJETIVO = listOf("Cumplido", "Parcialmente cumplido", "No cumplido")
+
 data class AdiccionUiState(
+    val versionEscala: Int = 2,
+    val editado: Boolean = false,
+    val objetivoPersonal: String = "",
+    val otroDesencadenante: Boolean = false,
+    val otraAccion: String = "",
+    val mostrarApoyo: Boolean = false,
     val catalogoAcciones: List<CatalogoAdiccionEntity> = emptyList(),
     val idRegistroExistente: String? = null,
     val editando: Boolean = false,
     val idAccionSeleccionada: Int? = null,
-    val nivelImpulso: Int = 5,
+    val nivelImpulso: Int = 2,
     val desencadenante: String = "",
-    val estadoObjetivo: String = "Logrado",
+    val estadoObjetivo: String = "",
     val fechaHora: String = "",
     val errorMsg: String? = null,
     val isLoading: Boolean = true,
@@ -51,21 +60,25 @@ class AdiccionViewModel @JvmOverloads constructor(
         _uiState.value = AdiccionUiState(editando = registroId != null)
         cargaJob = viewModelScope.launch {
             try {
-                check(dao.obtenerUsuario(usuarioId) != null)
+                val usuario = requireNotNull(dao.obtenerUsuario(usuarioId))
                 var inicializado = false
                 val registroFlow = registroId?.let { dao.observarRegistroAdiccion(it, usuarioId) } ?: flowOf(null)
                 combine(dao.obtenerCatalogoAdiccion(), registroFlow) { catalogo, registro -> catalogo to registro }
                     .collect { (catalogo, registro) ->
                         _uiState.update { actual ->
                             val base = if ((!inicializado || soloLectura) && registro != null) actual.copy(
-                                idRegistroExistente = registro.idRegistro, nivelImpulso = registro.nivelImpulso, desencadenante = registro.desencadenante,
-                                idAccionSeleccionada = registro.idAccionProtectora, estadoObjetivo = registro.estadoObjetivo,
+                                idRegistroExistente = registro.idRegistro, versionEscala = registro.versionEscala, editado = registro.editado,
+                                nivelImpulso = if (!soloLectura && registro.versionEscala == 1) -1 else registro.nivelImpulso,
+                                desencadenante = registro.desencadenante,
+                                otroDesencadenante = registro.desencadenante !in DESENCADENANTES_ADICCION.dropLast(1),
+                                otraAccion = registro.otraAccion.orEmpty(),
+                                idAccionSeleccionada = registro.idAccionProtectora, estadoObjetivo = if (soloLectura || registro.estadoObjetivo in ESTADOS_OBJETIVO) registro.estadoObjetivo else "",
                                 fechaHora = registro.fechaHora
                             ) else actual
                             if (registroId != null && registro == null) {
                                 AdiccionUiState(catalogoAcciones = catalogo, editando = true, isLoading = false,
                                     noDisponible = true, errorMsg = "No se encontró el registro solicitado.")
-                            } else base.copy(catalogoAcciones = catalogo, isLoading = false, cargaFallida = false)
+                            } else base.copy(catalogoAcciones = catalogo, objetivoPersonal = usuario.objetivoAdiccion, isLoading = false, cargaFallida = false)
                         }
                         inicializado = true
                     }
@@ -85,6 +98,23 @@ class AdiccionViewModel @JvmOverloads constructor(
         _uiState.update { if (it.isLoading || it.guardando || it.guardadoExitoso || it.cargaFallida || it.noDisponible) it else it.copy(desencadenante = valor, errorMsg = null) }
     }
 
+    fun seleccionarDesencadenante(valor: String) {
+        _uiState.update {
+            if (it.isLoading || it.guardando || it.guardadoExitoso || it.cargaFallida || it.noDisponible) it
+            else it.copy(otroDesencadenante = valor == DESENCADENANTES_ADICCION.last(),
+                desencadenante = if (valor == DESENCADENANTES_ADICCION.last()) "" else valor, errorMsg = null)
+        }
+    }
+
+    fun cambiarOtraAccion(valor: String) {
+        _uiState.update {
+            if (it.isLoading || it.guardando || it.guardadoExitoso || it.cargaFallida || it.noDisponible) it
+            else it.copy(otraAccion = valor, errorMsg = null)
+        }
+    }
+
+    fun cerrarApoyo() { _uiState.update { it.copy(mostrarApoyo = false) } }
+
     fun seleccionarAccion(id: Int) {
         _uiState.update { if (it.isLoading || it.guardando || it.guardadoExitoso || it.cargaFallida || it.noDisponible) it else it.copy(idAccionSeleccionada = id, errorMsg = null) }
     }
@@ -99,8 +129,10 @@ class AdiccionViewModel @JvmOverloads constructor(
         if (usuarioId != clave.first || state.isLoading || state.guardando || state.guardadoExitoso || state.noDisponible || state.cargaFallida) return
         val error = if (state.desencadenante.trim().isEmpty()) "Describe el factor desencadenante."
             else if (state.idAccionSeleccionada !in state.catalogoAcciones.map { it.idAccionProtectora }) "Selecciona una acción del catálogo."
-            else if (state.nivelImpulso !in 1..10) "El impulso debe estar entre 1 y 10."
-            else if (state.estadoObjetivo !in listOf("Logrado", "En proceso", "Resistido")) "Selecciona un objetivo válido."
+            else if (state.nivelImpulso !in 0..4) "Selecciona un nivel de impulso de 0 a 4."
+            else if (state.estadoObjetivo !in ESTADOS_OBJETIVO) "Selecciona un objetivo válido."
+            else if (state.idAccionSeleccionada == 5 && state.otraAccion.trim().length !in 3..250) "Describe la otra acción protectora (3 a 250 caracteres)."
+            else if (state.desencadenante.trim().length > 250) "El desencadenante admite hasta 250 caracteres."
             else null
         if (error != null) {
             _uiState.update { it.copy(errorMsg = error) }
@@ -112,22 +144,21 @@ class AdiccionViewModel @JvmOverloads constructor(
                 check(dao.obtenerUsuario(usuarioId) != null)
                 val id = clave.second
                 if (id != null) {
-                    check(dao.actualizarAdiccionDelUsuario(id, usuarioId, requireNotNull(state.idAccionSeleccionada), state.nivelImpulso, state.desencadenante.trim(), state.estadoObjetivo) == 1)
+                    check(dao.actualizarAdiccionDelUsuario(id, usuarioId, requireNotNull(state.idAccionSeleccionada), state.nivelImpulso, state.desencadenante.trim(), state.estadoObjetivo, state.otraAccion.trim().takeIf { state.idAccionSeleccionada == 5 }) == 1)
                 } else {
                     val fecha = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.ROOT).format(Date())
                     dao.insertarRegistroAdiccion(RegistroAdiccionEntity(idRegistro = UUID.randomUUID().toString(), idUsuario = usuarioId,
                         idAccionProtectora = requireNotNull(state.idAccionSeleccionada), fechaHora = fecha,
                         nivelImpulso = state.nivelImpulso, desencadenante = state.desencadenante.trim(),
-                        estadoObjetivo = state.estadoObjetivo))
+                        estadoObjetivo = state.estadoObjetivo, otraAccion = state.otraAccion.trim().takeIf { state.idAccionSeleccionada == 5 }))
                 }
             } catch (e: CancellationException) { throw e
             } catch (e: Exception) {
                 _uiState.update { it.copy(guardando = false, errorMsg = "No se pudo guardar el registro. Intenta nuevamente.") }
                 return@launch
             }
-            notificationHelper.mostrarNotificacionCheckIn("DailySync",
-                if (state.editando) "Registro actualizado." else "Nuevo registro guardado localmente.")
-            _uiState.update { it.copy(guardando = false, guardadoExitoso = true) }
+            notificationHelper.cancelarSiRegistroDeHoy(usuarioId, state.fechaHora.takeIf { state.editando })
+            _uiState.update { it.copy(guardando = false, guardadoExitoso = true, mostrarApoyo = state.nivelImpulso == 4) }
         }
     }
 }

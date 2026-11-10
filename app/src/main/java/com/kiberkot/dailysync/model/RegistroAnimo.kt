@@ -18,5 +18,7 @@ data class RegistroAnimo(
     val nivelIntensidad: Int,
     val contexto: String,
     val notaOpcional: String? = null,
-    val pendienteSync: Boolean = true
+    val pendienteSync: Boolean = true,
+    val versionEscala: Int = 2,
+    val editado: Boolean = false
 )

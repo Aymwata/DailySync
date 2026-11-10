@@ -64,11 +64,11 @@ class RegistroDbtViewModel @JvmOverloads constructor(
                             RegistroDbt(it.idRegistro, it.idUsuario, it.idHabilidad,
                                 habilidad?.nombre ?: "Habilidad DBT", habilidad?.modulo.orEmpty(),
                                 it.fechaHora, it.situacionAsociada, it.nivelIntensidad,
-                                it.utilidadPercibida, it.pendienteSync)
+                                it.utilidadPercibida, it.pendienteSync, it.versionEscala, it.editado)
                         }
                         _uiState.update { actual ->
                             val formulario = if (registroId != null && registro == null) FormularioDbt() else if (formularioInicializado) actual.formulario else {
-                                registro?.let { FormularioDbt(it.habilidadId, it.situacion, it.intensidad, it.utilidad) }
+                                registro?.let { FormularioDbt(it.habilidadId, it.situacion, if (it.versionEscala == 1) -1 else it.intensidad, it.utilidad) }
                                     ?: FormularioDbt(habilidadId = habilidadId)
                             }
                             actual.copy(catalogo = catalogo, registro = registro, formulario = formulario,
@@ -95,8 +95,8 @@ class RegistroDbtViewModel @JvmOverloads constructor(
         if (formulario.situacion.trim().length !in 3..250) {
             put("situacion", "Escribe entre 3 y 250 caracteres.")
         }
-        if (formulario.intensidad !in 1..5) {
-            put("intensidad", "La intensidad debe estar entre 1 y 5.")
+        if (formulario.intensidad !in 0..4) {
+            put("intensidad", "Selecciona una intensidad de 0 a 4.")
         }
         if (formulario.utilidad !in 1..5) {
             put("utilidad", "La utilidad debe estar entre 1 y 5.")
@@ -160,9 +160,7 @@ class RegistroDbtViewModel @JvmOverloads constructor(
                 ))
                 nuevoId
             }
-            notificationHelper.mostrarNotificacionCheckIn(
-                "DailySync", if (clave.second != null) "Práctica DBT actualizada." else "Nueva práctica DBT guardada localmente."
-            )
+            notificationHelper.cancelarSiRegistroDeHoy(usuarioId, actual.registro?.fechaHora)
             _uiState.update { it.copy(bannerExitoVisible = true) }
             delay(1000L)
             _uiState.update { it.copy(bannerExitoVisible = false) }

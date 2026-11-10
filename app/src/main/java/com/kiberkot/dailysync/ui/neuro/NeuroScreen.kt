@@ -1,23 +1,24 @@
 package com.kiberkot.dailysync.ui.neuro
 
 import androidx.activity.compose.BackHandler
+import com.kiberkot.dailysync.ui.components.RegistroRapidoConfig
+import com.kiberkot.dailysync.ui.components.ControlesRegistroRapido
+import com.kiberkot.dailysync.ui.components.PieRegistroRapido
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,7 +38,6 @@ import androidx.compose.ui.unit.sp
 import com.kiberkot.dailysync.R
 import com.kiberkot.dailysync.data.local.entities.CatalogoNeuroEntity
 import com.kiberkot.dailysync.ui.components.EstadoRegistro
-import com.kiberkot.dailysync.ui.theme.BarrasClarasMarca
 import com.kiberkot.dailysync.ui.theme.DailySyncBrand as Brand
 import com.kiberkot.dailysync.viewmodel.NeuroUiState
 
@@ -64,26 +64,25 @@ fun NeuroScreen(
     onGuardar: () -> Unit,
     onVolver: () -> Unit,
     onReintentar: () -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    registroRapido: RegistroRapidoConfig? = null
 ) {
+    val lista = rememberLazyListState()
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
-    val campoRequerido = remember { BringIntoViewRequester() }
-    val opcionRequerida = remember { BringIntoViewRequester() }
     var intentos by remember { mutableIntStateOf(0) }
     var errorMostrado by remember { mutableIntStateOf(0) }
     LaunchedEffect(intentos, state.errorMsg) {
         if (intentos > errorMostrado && state.errorMsg != null) {
             errorMostrado = intentos
             when {
-                state.tipoActividad.isBlank() -> campoRequerido.bringIntoView()
-                state.idEstrategiaSeleccionada == null -> opcionRequerida.bringIntoView()
+                state.tipoActividad.isBlank() -> lista.animateScrollToItem(1)
+                state.idEstrategiaSeleccionada == null -> lista.animateScrollToItem(3)
             }
         }
     }
 
     BackHandler(enabled = state.guardando || state.guardadoExitoso) { }
-    BarrasClarasMarca()
 
     val disponible = !state.isLoading && !state.cargaFallida && !state.noDisponible
     val guardar = {
@@ -154,6 +153,7 @@ fun NeuroScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        ControlesRegistroRapido(registroRapido, habilitado = !state.guardando && !state.guardadoExitoso)
                         state.errorMsg?.let { ErrorNeuro(it) }
 
 
@@ -193,7 +193,7 @@ fun NeuroScreen(
                         Text("Se guarda en este dispositivo", style = textoNeuro(12), color = Brand.Muted)
                     }
                 }
-            }
+            } else PieRegistroRapido(registroRapido)
         }
     ) { padding ->
         if (!disponible) {
@@ -201,207 +201,209 @@ fun NeuroScreen(
             return@Scaffold
         }
 
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp),
+                .padding(padding),
+            state = lista, contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    if (editando) "Revisa tu autorregulación" else "Registro de Autorregulación",
-                    style = textoNeuro(25, FontWeight.Bold),
-                    color = Brand.Ink
-                )
-                Text(
-                    "Monitorea la sobrecarga sensorial y evalúa tus estrategias.",
-                    style = textoNeuro(14),
-                    color = Brand.Muted
-                )
+            item(key = "seccion_0") {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        if (editando) "Revisa tu autorregulación" else "Registro de Autorregulación",
+                        style = textoNeuro(25, FontWeight.Bold),
+                        color = Brand.Ink
+                    )
+                    Text(
+                        "Monitorea la sobrecarga sensorial y evalúa tus estrategias.",
+                        style = textoNeuro(14),
+                        color = Brand.Muted
+                    )
+                }
             }
-
-
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                PasoNeuro("1", "Tipo de actividad o tarea")
-                Surface(
-                    shape = RoundedCornerShape(24.dp),
-                    color = Color.White,
-                    border = BorderStroke(1.dp, Brand.Border)
-                ) {
-                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("¿Qué estabas realizando?", style = textoNeuro(13), color = Brand.Muted)
-                        OutlinedTextField(
-                            enabled = !state.guardando && !state.guardadoExitoso,
-                            value = state.tipoActividad,
-                            onValueChange = onCambioTipoActividad,
-                            textStyle = textoNeuro(16),
-                            placeholder = { Text("Ej. Estudio intenso, reunión ruidosa", style = textoNeuro(14), color = Color(0xFF7A9389)) },
-                            shape = RoundedCornerShape(18.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Brand.Field, unfocusedContainerColor = Brand.Field,
-                                focusedBorderColor = Brand.Teal, unfocusedBorderColor = Brand.Border,
-                                focusedTextColor = Brand.Ink, unfocusedTextColor = Brand.Ink
-                            ),
-                            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Next),
-                            keyboardActions = KeyboardActions(onNext = { focus.moveFocus(androidx.compose.ui.focus.FocusDirection.Down) }),
-                            modifier = Modifier.fillMaxWidth().testTag("neuro_actividad")
-                                .semantics { contentDescription = "Actividad o tarea" }.bringIntoViewRequester(campoRequerido)
-                        )
+            item(key = "seccion_1") {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    PasoNeuro("1", "Tipo de actividad o tarea")
+                    Surface(
+                        shape = RoundedCornerShape(24.dp),
+                        color = Color.White,
+                        border = BorderStroke(1.dp, Brand.Border)
+                    ) {
+                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("¿Qué estabas realizando?", style = textoNeuro(13), color = Brand.Muted)
+                            OutlinedTextField(
+                                enabled = !state.guardando && !state.guardadoExitoso,
+                                value = state.tipoActividad,
+                                onValueChange = com.kiberkot.dailysync.ui.components.conActividadSesion(onCambioTipoActividad),
+                                textStyle = textoNeuro(16),
+                                placeholder = { Text("Ej. Estudio intenso, reunión ruidosa", style = textoNeuro(14), color = Color(0xFF7A9389)) },
+                                shape = RoundedCornerShape(18.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedContainerColor = Brand.Field, unfocusedContainerColor = Brand.Field,
+                                    focusedBorderColor = Brand.Teal, unfocusedBorderColor = Brand.Border,
+                                    focusedTextColor = Brand.Ink, unfocusedTextColor = Brand.Ink
+                                ),
+                                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Next),
+                                keyboardActions = KeyboardActions(onNext = { focus.moveFocus(androidx.compose.ui.focus.FocusDirection.Down) }),
+                                modifier = Modifier.fillMaxWidth().testTag("neuro_actividad")
+                                    .semantics { contentDescription = "Actividad o tarea" }
+                            )
+                        }
                     }
                 }
             }
-
-
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                PasoNeuro("2", "Sobrecarga sensorial")
-                Surface(
-                    shape = RoundedCornerShape(24.dp),
-                    color = Color.White,
-                    border = BorderStroke(1.dp, Brand.Border)
-                ) {
-                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Nivel de sobrecarga", style = textoNeuro(14, FontWeight.Medium), color = Brand.Ink)
-                            Text(descripcionNivel(state.nivelSobrecarga), style = textoNeuro(12, FontWeight.SemiBold), color = NeuroAccent)
-                        }
-                        Row(
-                            Modifier.fillMaxWidth().selectableGroup(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            (1..5).forEach { nivel ->
-                                val seleccionada = state.nivelSobrecarga == nivel
-                                Surface(
-                                    shape = RoundedCornerShape(14.dp),
-                                    color = if (seleccionada) NeuroAccent else Color(0xFFF5F7F3),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .heightIn(min = 48.dp)
-                                        .selectable(
-                                            selected = seleccionada,
-                                            enabled = !state.guardando && !state.guardadoExitoso,
-                                            role = Role.RadioButton,
-                                            onClick = { onCambioSobrecarga(nivel) }
-                                        )
-                                ) {
-                                    Box(Modifier.padding(vertical = 10.dp).clearAndSetSemantics { contentDescription = "Sobrecarga: $nivel de 5" }, contentAlignment = Alignment.Center) {
-                                        Text(
-                                            "$nivel",
-                                            style = textoNeuro(18, FontWeight.SemiBold),
-                                            color = if (seleccionada) Color.White else Brand.Muted
-                                        )
+            item(key = "seccion_2") {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    PasoNeuro("2", "Sobrecarga sensorial")
+                    if (state.versionEscala == 1) Text(com.kiberkot.dailysync.model.AVISO_ESCALA_ANTERIOR,
+                        style = textoNeuro(13), color = Brand.Muted)
+                    Surface(
+                        shape = RoundedCornerShape(24.dp),
+                        color = Color.White,
+                        border = BorderStroke(1.dp, Brand.Border)
+                    ) {
+                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Nivel de sobrecarga", style = textoNeuro(14, FontWeight.Medium), color = Brand.Ink)
+                                Text(com.kiberkot.dailysync.model.etiquetaIntensidad(state.nivelSobrecarga), style = textoNeuro(12, FontWeight.SemiBold), color = NeuroAccent)
+                            }
+                            Row(
+                                Modifier.fillMaxWidth().selectableGroup(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                (0..4).forEach { nivel ->
+                                    val seleccionada = state.nivelSobrecarga == nivel
+                                    Surface(
+                                        shape = RoundedCornerShape(14.dp),
+                                        color = if (seleccionada) NeuroAccent else Color(0xFFF5F7F3),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .heightIn(min = 48.dp)
+                                            .selectable(
+                                                selected = seleccionada,
+                                                enabled = !state.guardando && !state.guardadoExitoso,
+                                                role = Role.RadioButton,
+                                                onClick = { onCambioSobrecarga(nivel) }
+                                            )
+                                    ) {
+                                        Box(Modifier.padding(vertical = 10.dp).clearAndSetSemantics { contentDescription = "Sobrecarga: $nivel de 4: ${com.kiberkot.dailysync.model.etiquetaIntensidad(nivel)}" }, contentAlignment = Alignment.Center) {
+                                            Text(
+                                                "$nivel",
+                                                style = textoNeuro(18, FontWeight.SemiBold),
+                                                color = if (seleccionada) Color.White else Brand.Muted
+                                            )
+                                        }
                                     }
                                 }
                             }
-                        }
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Baja / Nula", style = textoNeuro(12), color = Brand.Muted)
-                            Text("Extrema", style = textoNeuro(12), color = Brand.Muted)
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Sin síntomas", style = textoNeuro(12), color = Brand.Muted)
+                                Text("Severa", style = textoNeuro(12), color = Brand.Muted)
+                            }
                         }
                     }
                 }
             }
-
-
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                PasoNeuro("3", "Elige una estrategia")
-                Column(Modifier.fillMaxWidth().selectableGroup().bringIntoViewRequester(opcionRequerida), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    state.catalogoEstrategias.forEach { est ->
-                        OpcionEstrategiaNeuro(
-                            estrategia = est,
-                            seleccionada = state.idEstrategiaSeleccionada == est.idEstrategia,
-                            enabled = !state.guardando && !state.guardadoExitoso,
-                            onSelect = { onSeleccionarEstrategia(est.idEstrategia) }
-                        )
-                    }
-                }
-            }
-
-
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                PasoNeuro("4", "Añade contexto o entorno")
-                Surface(
-                    shape = RoundedCornerShape(24.dp),
-                    color = Color.White,
-                    border = BorderStroke(1.dp, Brand.Border)
-                ) {
-                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("¿Dónde estabas o qué pasaba alrededor?", style = textoNeuro(13), color = Brand.Muted)
-                        OutlinedTextField(
-                            enabled = !state.guardando && !state.guardadoExitoso,
-                            value = state.contexto,
-                            onValueChange = onCambioContexto,
-                            textStyle = textoNeuro(16),
-                            minLines = 2,
-                            placeholder = { Text("Ej. Habitación con luz tenue y audífonos", style = textoNeuro(14), color = Color(0xFF7A9389)) },
-                            shape = RoundedCornerShape(18.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Brand.Field, unfocusedContainerColor = Brand.Field,
-                                focusedBorderColor = Brand.Teal, unfocusedBorderColor = Brand.Border,
-                                focusedTextColor = Brand.Ink, unfocusedTextColor = Brand.Ink
-                            ),
-                            modifier = Modifier.fillMaxWidth().testTag("neuro_contexto")
-                                .semantics { contentDescription = "Contexto o entorno" }
-                        )
-                    }
-                }
-            }
-
-
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                PasoNeuro("5", "Resultado / Efectividad")
-                Surface(
-                    shape = RoundedCornerShape(24.dp),
-                    color = Color.White,
-                    border = BorderStroke(1.dp, Brand.Border)
-                ) {
-                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("¿Qué tan útil resultó la estrategia?", style = textoNeuro(14, FontWeight.Medium), color = Brand.Ink, modifier = Modifier.weight(1f).padding(end = 8.dp))
-                            Text(descripcionEfectividad(state.resultadoPercibido), style = textoNeuro(12, FontWeight.SemiBold), color = Brand.Emerald)
+            item(key = "seccion_3") {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    PasoNeuro("3", "Elige una estrategia")
+                    Column(Modifier.fillMaxWidth().selectableGroup(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        state.catalogoEstrategias.forEach { est ->
+                            OpcionEstrategiaNeuro(
+                                estrategia = est,
+                                seleccionada = state.idEstrategiaSeleccionada == est.idEstrategia,
+                                enabled = !state.guardando && !state.guardadoExitoso,
+                                onSelect = { onSeleccionarEstrategia(est.idEstrategia) }
+                            )
                         }
-                        Row(
-                            Modifier.fillMaxWidth().selectableGroup(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            (1..5).forEach { nivel ->
-                                val seleccionada = state.resultadoPercibido == nivel
-                                Surface(
-                                    shape = RoundedCornerShape(14.dp),
-                                    color = if (seleccionada) Brand.Emerald else Color(0xFFF5F7F3),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .heightIn(min = 48.dp)
-                                        .selectable(
-                                            selected = seleccionada,
-                                            enabled = !state.guardando && !state.guardadoExitoso,
-                                            role = Role.RadioButton,
-                                            onClick = { onCambioResultado(nivel) }
-                                        )
-                                ) {
-                                    Box(Modifier.padding(vertical = 10.dp).clearAndSetSemantics { contentDescription = "Resultado: $nivel de 5" }, contentAlignment = Alignment.Center) {
-                                        Text(
-                                            "$nivel",
-                                            style = textoNeuro(18, FontWeight.SemiBold),
-                                            color = if (seleccionada) Color.White else Brand.Muted
-                                        )
+                    }
+                }
+            }
+            item(key = "seccion_4") {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    PasoNeuro("4", "Añade contexto o entorno")
+                    Surface(
+                        shape = RoundedCornerShape(24.dp),
+                        color = Color.White,
+                        border = BorderStroke(1.dp, Brand.Border)
+                    ) {
+                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("¿Dónde estabas o qué pasaba alrededor?", style = textoNeuro(13), color = Brand.Muted)
+                            OutlinedTextField(
+                                enabled = !state.guardando && !state.guardadoExitoso,
+                                value = state.contexto,
+                                onValueChange = com.kiberkot.dailysync.ui.components.conActividadSesion(onCambioContexto),
+                                textStyle = textoNeuro(16),
+                                minLines = 2,
+                                placeholder = { Text("Ej. Habitación con luz tenue y audífonos", style = textoNeuro(14), color = Color(0xFF7A9389)) },
+                                shape = RoundedCornerShape(18.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedContainerColor = Brand.Field, unfocusedContainerColor = Brand.Field,
+                                    focusedBorderColor = Brand.Teal, unfocusedBorderColor = Brand.Border,
+                                    focusedTextColor = Brand.Ink, unfocusedTextColor = Brand.Ink
+                                ),
+                                modifier = Modifier.fillMaxWidth().testTag("neuro_contexto")
+                                    .semantics { contentDescription = "Contexto o entorno" }
+                            )
+                        }
+                    }
+                }
+            }
+            item(key = "seccion_5") {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    PasoNeuro("5", "Resultado / Efectividad")
+                    Surface(
+                        shape = RoundedCornerShape(24.dp),
+                        color = Color.White,
+                        border = BorderStroke(1.dp, Brand.Border)
+                    ) {
+                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("¿Qué tan útil resultó la estrategia?", style = textoNeuro(14, FontWeight.Medium), color = Brand.Ink, modifier = Modifier.weight(1f).padding(end = 8.dp))
+                                Text(descripcionEfectividad(state.resultadoPercibido), style = textoNeuro(12, FontWeight.SemiBold), color = Brand.Emerald)
+                            }
+                            Row(
+                                Modifier.fillMaxWidth().selectableGroup(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                (1..5).forEach { nivel ->
+                                    val seleccionada = state.resultadoPercibido == nivel
+                                    Surface(
+                                        shape = RoundedCornerShape(14.dp),
+                                        color = if (seleccionada) Brand.Emerald else Color(0xFFF5F7F3),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .heightIn(min = 48.dp)
+                                            .selectable(
+                                                selected = seleccionada,
+                                                enabled = !state.guardando && !state.guardadoExitoso,
+                                                role = Role.RadioButton,
+                                                onClick = { onCambioResultado(nivel) }
+                                            )
+                                    ) {
+                                        Box(Modifier.padding(vertical = 10.dp).clearAndSetSemantics { contentDescription = "Resultado: $nivel de 5" }, contentAlignment = Alignment.Center) {
+                                            Text(
+                                                "$nivel",
+                                                style = textoNeuro(18, FontWeight.SemiBold),
+                                                color = if (seleccionada) Color.White else Brand.Muted
+                                            )
+                                        }
                                     }
                                 }
                             }
-                        }
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Sin efecto", style = textoNeuro(12), color = Brand.Muted)
-                            Text("Muy efectiva", style = textoNeuro(12), color = Brand.Muted)
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Sin efecto", style = textoNeuro(12), color = Brand.Muted)
+                                Text("Muy efectiva", style = textoNeuro(12), color = Brand.Muted)
+                            }
                         }
                     }
                 }

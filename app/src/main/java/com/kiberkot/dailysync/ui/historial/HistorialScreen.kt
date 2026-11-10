@@ -11,14 +11,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.*
 import com.kiberkot.dailysync.R
-import com.kiberkot.dailysync.ui.theme.BarrasClarasMarca
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -41,10 +45,28 @@ fun HistorialScreen(
     onConfirmarEliminar: () -> Unit,
     onReintentar: () -> Unit,
     onVolver: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onSeleccionarFecha: (String?) -> Unit = {}
 ) {
-    BarrasClarasMarca()
-    val visibles = state.registrosVisibles
+    val visibles = remember(state.registros, state.filtroSeleccionado, state.fechaSeleccionada) {
+        state.registrosVisibles
+    }
+    var mostrarFecha by rememberSaveable { mutableStateOf(false) }
+    val formatoIso = remember { SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).apply { timeZone = TimeZone.getTimeZone("UTC") } }
+    if (mostrarFecha) {
+        val selector = rememberDatePickerState(initialSelectedDateMillis = state.fechaSeleccionada?.let {
+            formatoIso.parse(it)?.time
+        })
+        DatePickerDialog(onDismissRequest = { mostrarFecha = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    selector.selectedDateMillis?.let { onSeleccionarFecha(formatoIso.format(Date(it))) }
+                    mostrarFecha = false
+                }, enabled = selector.selectedDateMillis != null) { Text("Aplicar") }
+            }, dismissButton = { TextButton(onClick = { mostrarFecha = false }) { Text("Cancelar") } }) {
+            DatePicker(state = selector, title = { Text("Fecha del registro", modifier = Modifier.padding(20.dp)) }, showModeToggle = true)
+        }
+    }
 
     Scaffold(
         modifier = modifier,
@@ -137,6 +159,19 @@ fun HistorialScreen(
                 }
             }
 
+            item {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FiltroHistorial("Todas las fechas", state.fechaSeleccionada == null,
+                        DailySyncBrand.Teal, DailySyncBrand.Field) { onSeleccionarFecha(null) }
+                    val hoy = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date())
+                    FiltroHistorial("Hoy", state.fechaSeleccionada == hoy,
+                        DailySyncBrand.Teal, DailySyncBrand.Field) { onSeleccionarFecha(hoy) }
+                    val fecha = state.fechaSeleccionada?.split("-")?.reversed()?.joinToString("/")
+                    FiltroHistorial(fecha ?: "Elegir fecha", state.fechaSeleccionada != null,
+                        DailySyncBrand.Teal, DailySyncBrand.Field) { mostrarFecha = true }
+                }
+            }
+
             state.mensaje?.let { mensaje ->
                 item {
                     Text(
@@ -176,7 +211,9 @@ fun HistorialScreen(
             } else if (visibles.isEmpty() && state.error == null) {
                 item {
                     Text(
-                        text = if (state.filtroSeleccionado == null) {
+                        text = if (state.fechaSeleccionada != null) {
+                            "No hay registros para esta fecha y los filtros seleccionados."
+                        } else if (state.filtroSeleccionado == null) {
                             "Todavía no tienes registros."
                         } else {
                             "No hay registros de este ámbito."
@@ -287,15 +324,19 @@ private fun TarjetaHistorialBrand(
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(registro.ambito.titulo, fontFamily = DailySyncBrand.Font, fontSize = 12.sp,
                         color = estilo.acento, fontWeight = FontWeight.SemiBold)
-                    Text(formatearFechaRegistro(registro.fechaHora), fontFamily = DailySyncBrand.Font,
+                    Text(remember(registro.fechaHora) { formatearFechaRegistro(registro.fechaHora) }, fontFamily = DailySyncBrand.Font,
                         fontSize = 12.sp, color = DailySyncBrand.Muted)
                 }
+            }
+            if (registro.editado) Surface(shape = RoundedCornerShape(8.dp), color = estilo.fondo) {
+                Text("Editado", fontFamily = DailySyncBrand.Font, fontSize = 12.sp, color = estilo.acento,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
             }
             Text(registro.titulo, fontFamily = DailySyncBrand.Font, fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold, color = DailySyncBrand.Ink)
             Text(registro.descripcion, fontFamily = DailySyncBrand.Font, fontSize = 15.sp,
                 lineHeight = 22.sp, color = DailySyncBrand.Muted)
-            Text("Intensidad: ${registro.intensidad}", fontFamily = DailySyncBrand.Font,
+            Text("Intensidad: ${com.kiberkot.dailysync.model.textoIntensidad(registro.intensidad, registro.versionEscala, if (registro.ambito == AmbitoRegistro.ADICCIONES) 10 else 5)}", fontFamily = DailySyncBrand.Font,
                 fontSize = 13.sp, color = estilo.acento)
             HorizontalDivider(color = DailySyncBrand.Border)
             FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {

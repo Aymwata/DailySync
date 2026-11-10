@@ -53,7 +53,7 @@ internal fun CampoAcceso(
                 modifier = Modifier.size(18.dp), tint = Brand.Teal.copy(alpha = 0.85f))
             Spacer(Modifier.width(12.dp))
             BasicTextField(
-                value = valor, onValueChange = onCambio, enabled = enabled, singleLine = true,
+                value = valor, onValueChange = com.kiberkot.dailysync.ui.components.conActividadSesion(onCambio), enabled = enabled, singleLine = true,
                 textStyle = estiloAcceso(14).copy(color = Brand.Ink),
                 cursorBrush = androidx.compose.ui.graphics.SolidColor(Brand.Teal),
                 interactionSource = interaction, keyboardOptions = keyboardOptions,

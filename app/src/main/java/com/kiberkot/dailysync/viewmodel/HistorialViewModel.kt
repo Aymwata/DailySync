@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 data class HistorialUiState(
     val registros: List<RegistroHistorial> = emptyList(),
     val filtroSeleccionado: AmbitoRegistro? = null,
+    val fechaSeleccionada: String? = null,
     val cargando: Boolean = true,
     val error: String? = null,
     val mensaje: String? = null,
@@ -25,8 +26,8 @@ data class HistorialUiState(
 ) {
     val registrosVisibles: List<RegistroHistorial>
         get() = registros.filter { registro ->
-            filtroSeleccionado == null ||
-                    registro.ambito == filtroSeleccionado
+            (filtroSeleccionado == null || registro.ambito == filtroSeleccionado) &&
+                (fechaSeleccionada == null || registro.fechaHora.take(10) == fechaSeleccionada)
         }
 }
 
@@ -48,8 +49,9 @@ class HistorialViewModel(
         if (_uiState.value.eliminando) return
 
         observacion?.cancel()
+        val mismoUsuario = usuarioActual == usuarioId
         usuarioActual = usuarioId
-        _uiState.value = HistorialUiState()
+        _uiState.value = if (mismoUsuario) _uiState.value.copy(cargando = true, error = null) else HistorialUiState()
 
         observacion = viewModelScope.launch {
             try {
@@ -79,6 +81,10 @@ class HistorialViewModel(
         _uiState.update {
             it.copy(filtroSeleccionado = ambito)
         }
+    }
+
+    fun seleccionarFecha(fecha: String?) {
+        _uiState.update { it.copy(fechaSeleccionada = fecha) }
     }
 
     fun solicitarEliminacion(registro: RegistroHistorial) {

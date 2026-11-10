@@ -1,22 +1,23 @@
 package com.kiberkot.dailysync.ui.registro
 
 import androidx.activity.compose.BackHandler
+import com.kiberkot.dailysync.ui.components.RegistroRapidoConfig
+import com.kiberkot.dailysync.ui.components.ControlesRegistroRapido
+import com.kiberkot.dailysync.ui.components.PieRegistroRapido
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -38,7 +39,6 @@ import androidx.compose.ui.unit.dp
 import com.kiberkot.dailysync.R
 import com.kiberkot.dailysync.model.CategoriaAnimo
 import com.kiberkot.dailysync.ui.components.EstadoRegistro
-import com.kiberkot.dailysync.ui.theme.BarrasClarasMarca
 import com.kiberkot.dailysync.ui.theme.DailySyncBrand as Brand
 import com.kiberkot.dailysync.ui.theme.DailySyncTheme
 import com.kiberkot.dailysync.viewmodel.AnimoUiState
@@ -56,13 +56,13 @@ fun RegistroAnimoScreen(
     onGuardar: () -> Unit,
     onVolver: () -> Unit,
     onReintentar: () -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    registroRapido: RegistroRapidoConfig? = null
 ) {
+    val lista = rememberLazyListState()
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     var mostrarNota by rememberSaveable { mutableStateOf(false) }
-    val categoriaVisible = remember { BringIntoViewRequester() }
-    val contextoVisible = remember { BringIntoViewRequester() }
     var intentosGuardar by remember { mutableIntStateOf(0) }
     var validacionMostrada by remember { mutableIntStateOf(0) }
     LaunchedEffect(intentosGuardar, state.errorCategoria, state.errorContexto) {
@@ -70,11 +70,11 @@ fun RegistroAnimoScreen(
             when {
                 state.errorCategoria != null -> {
                     validacionMostrada = intentosGuardar
-                    categoriaVisible.bringIntoView()
+                    lista.animateScrollToItem(1)
                 }
                 state.errorContexto != null -> {
                     validacionMostrada = intentosGuardar
-                    contextoVisible.bringIntoView()
+                    lista.animateScrollToItem(3)
                 }
             }
         }
@@ -83,7 +83,6 @@ fun RegistroAnimoScreen(
         if (state.notaOpcional.isNotBlank()) mostrarNota = true
     }
     BackHandler(enabled = state.guardando) { }
-    BarrasClarasMarca()
     val disponible = !state.cargando && !state.cargaFallida && !state.noDisponible
     val guardar = {
         intentosGuardar++
@@ -120,6 +119,7 @@ fun RegistroAnimoScreen(
                     border = BorderStroke(1.dp, Brand.Border)) {
                     Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ControlesRegistroRapido(registroRapido, habilitado = !state.guardando)
                         state.error?.let { ErrorAnimo(it) }
                         val shape = RoundedCornerShape(18.dp)
                         Button(onClick = guardar, enabled = !state.guardando, shape = shape,
@@ -146,107 +146,116 @@ fun RegistroAnimoScreen(
                         Text("Se guarda en este dispositivo", style = textoAnimo(12), color = Brand.Muted)
                     }
                 }
-            }
+            } else PieRegistroRapido(registroRapido)
         }
     ) { padding ->
         if (!disponible) {
             EstadoRegistro(state.cargando, state.error, onReintentar, Modifier.padding(padding))
             return@Scaffold
         }
-        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(if (editando) "Revisa cómo te sentías" else "¿Cómo te sientes hoy?",
-                    style = textoAnimo(25, FontWeight.Bold), color = Brand.Ink)
-                Text(if (editando) "Puedes ajustar tu registro con calma." else "Elige lo que más se acerca a este momento.",
-                    style = textoAnimo(14), color = Brand.Muted)
-            }
-            Column(Modifier.bringIntoViewRequester(categoriaVisible), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                PasoAnimo("1", "Elige tu estado")
-                Column(Modifier.fillMaxWidth().selectableGroup(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    state.categorias.chunked(2).forEach { fila ->
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            fila.forEach { categoria ->
-                                OpcionAnimo(categoria, state.categoriaSeleccionada?.id == categoria.id,
-                                    !state.guardando, { onSeleccionarCategoria(categoria) }, Modifier.weight(1f))
-                            }
-                        }
-                    }
+        LazyColumn(Modifier.fillMaxSize().padding(padding), state = lista, contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            item(key = "seccion_0") {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(if (editando) "Revisa cómo te sentías" else "¿Cómo te sientes hoy?",
+                        style = textoAnimo(25, FontWeight.Bold), color = Brand.Ink)
+                    Text(if (editando) "Puedes ajustar tu registro con calma." else "Elige lo que más se acerca a este momento.",
+                        style = textoAnimo(14), color = Brand.Muted)
                 }
-                state.errorCategoria?.let { ErrorAnimo(it) }
             }
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                PasoAnimo("2", "Ajusta la intensidad")
-                Surface(shape = RoundedCornerShape(24.dp), color = Color.White,
-                    border = BorderStroke(1.dp, Brand.Border)) {
-                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically) {
-                            Text("¿Cuánto lo sientes?", style = textoAnimo(14, FontWeight.Medium), color = Brand.Ink)
-                            Text(descripcionIntensidad(state.nivelIntensidad.toInt()), style = textoAnimo(12, FontWeight.SemiBold),
-                                color = AnimoAccent)
-                        }
-                        Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            (1..5).forEach { nivel ->
-                                val seleccionada = state.nivelIntensidad.toInt() == nivel
-                                Surface(shape = RoundedCornerShape(14.dp),
-                                    color = if (seleccionada) AnimoAccent else Color(0xFFF5F7F3),
-                                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)
-                                        .selectable(selected = seleccionada, enabled = !state.guardando, role = Role.RadioButton,
-                                            onClick = { onCambioIntensidad(nivel.toFloat()) })
-                                        .testTag("animo_intensidad_$nivel").semantics {
-                                            contentDescription = "Intensidad $nivel de 5: ${descripcionIntensidad(nivel)}"
-                                        }) {
-                                    Box(Modifier.padding(vertical = 10.dp).clearAndSetSemantics {
-                                        contentDescription = "Intensidad $nivel de 5: ${descripcionIntensidad(nivel)}"
-                                    }, contentAlignment = Alignment.Center) {
-                                        Text("$nivel", style = textoAnimo(18, FontWeight.SemiBold),
-                                            color = if (seleccionada) Color.White else Brand.Muted)
-                                    }
+            item(key = "seccion_1") {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    PasoAnimo("1", "Elige tu estado")
+                    Column(Modifier.fillMaxWidth().selectableGroup(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        state.categorias.chunked(2).forEach { fila ->
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                fila.forEach { categoria ->
+                                    OpcionAnimo(categoria, state.categoriaSeleccionada?.id == categoria.id,
+                                        !state.guardando, { onSeleccionarCategoria(categoria) }, Modifier.weight(1f))
                                 }
                             }
                         }
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Suave", style = textoAnimo(12), color = Brand.Muted)
-                            Text("Muy intensa", style = textoAnimo(12), color = Brand.Muted)
+                    }
+                    state.errorCategoria?.let { ErrorAnimo(it) }
+                }
+            }
+            item(key = "seccion_2") {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    PasoAnimo("2", "Ajusta la intensidad")
+                    if (state.versionEscala == 1) Text(com.kiberkot.dailysync.model.AVISO_ESCALA_ANTERIOR,
+                        style = textoAnimo(13), color = Brand.Muted)
+                    Surface(shape = RoundedCornerShape(24.dp), color = Color.White,
+                        border = BorderStroke(1.dp, Brand.Border)) {
+                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically) {
+                                Text("¿Cuánto lo sientes?", style = textoAnimo(14, FontWeight.Medium), color = Brand.Ink)
+                                Text(descripcionIntensidad(state.nivelIntensidad.toInt()), style = textoAnimo(12, FontWeight.SemiBold),
+                                    color = AnimoAccent)
+                            }
+                            Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                (0..4).forEach { nivel ->
+                                    val seleccionada = state.nivelIntensidad.toInt() == nivel
+                                    Surface(shape = RoundedCornerShape(14.dp),
+                                        color = if (seleccionada) AnimoAccent else Color(0xFFF5F7F3),
+                                        modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                                            .selectable(selected = seleccionada, enabled = !state.guardando, role = Role.RadioButton,
+                                                onClick = { onCambioIntensidad(nivel.toFloat()) })
+                                            .testTag("animo_intensidad_$nivel").semantics {
+                                                contentDescription = "Intensidad $nivel de 4: ${descripcionIntensidad(nivel)}"
+                                            }) {
+                                        Box(Modifier.padding(vertical = 10.dp).clearAndSetSemantics {
+                                            contentDescription = "Intensidad $nivel de 4: ${descripcionIntensidad(nivel)}"
+                                        }, contentAlignment = Alignment.Center) {
+                                            Text("$nivel", style = textoAnimo(18, FontWeight.SemiBold),
+                                                color = if (seleccionada) Color.White else Brand.Muted)
+                                        }
+                                    }
+                                }
+                            }
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Sin síntomas", style = textoAnimo(12), color = Brand.Muted)
+                                Text("Severa", style = textoAnimo(12), color = Brand.Muted)
+                            }
                         }
                     }
                 }
             }
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                PasoAnimo("3", "Añade contexto")
-                Surface(shape = RoundedCornerShape(24.dp), color = Color.White,
-                    border = BorderStroke(1.dp, Brand.Border)) {
-                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Contexto", style = textoAnimo(14, FontWeight.SemiBold), color = Brand.Ink,
-                                modifier = Modifier.clearAndSetSemantics {})
-                            Text("Obligatorio", style = textoAnimo(12), color = Brand.Muted)
-                        }
-                        Text("¿Qué estaba pasando?", style = textoAnimo(13), color = Brand.Muted)
-                        CampoAnimo(state.contexto, onCambioContexto, "Ej. Terminando una tarea en casa",
-                            "Contexto", "animo_contexto", !state.guardando, state.errorContexto,
-                            KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Next),
-                            KeyboardActions(onNext = { focus.moveFocus(FocusDirection.Down) }),
-                            modifier = Modifier.bringIntoViewRequester(contextoVisible))
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Entre 3 y 60 caracteres", style = textoAnimo(12), color = Brand.Muted)
-                            Text("${state.contexto.trim().length}/60", style = textoAnimo(12),
-                                color = if (state.contexto.trim().length > 60) Brand.Error else Brand.Muted)
-                        }
-                        HorizontalDivider(color = Brand.Border)
-                        TextButton(onClick = { mostrarNota = !mostrarNota }, enabled = !state.guardando,
-                            contentPadding = PaddingValues(horizontal = 0.dp, vertical = 6.dp)) {
-                            Icon(painterResource(R.drawable.ic_form_note), null, Modifier.size(19.dp), tint = Brand.Teal)
-                            Spacer(Modifier.width(8.dp))
-                            Text(if (mostrarNota) "Ocultar nota opcional" else if (state.notaOpcional.isNotBlank()) "Editar nota opcional"
-                                else "Añadir nota opcional", style = textoAnimo(14, FontWeight.Medium), color = Brand.Teal)
-                        }
-                        if (mostrarNota) {
-                            CampoAnimo(state.notaOpcional, onCambioNota, "Algo que quieras recordar…",
-                                "Nota opcional", "animo_nota", !state.guardando, null,
-                                KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Default),
-                                KeyboardActions.Default)
+            item(key = "seccion_3") {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    PasoAnimo("3", "Añade contexto")
+                    Surface(shape = RoundedCornerShape(24.dp), color = Color.White,
+                        border = BorderStroke(1.dp, Brand.Border)) {
+                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Contexto", style = textoAnimo(14, FontWeight.SemiBold), color = Brand.Ink,
+                                    modifier = Modifier.clearAndSetSemantics {})
+                                Text("Obligatorio", style = textoAnimo(12), color = Brand.Muted)
+                            }
+                            Text("¿Qué estaba pasando?", style = textoAnimo(13), color = Brand.Muted)
+                            CampoAnimo(state.contexto, onCambioContexto, "Ej. Terminando una tarea en casa",
+                                "Contexto", "animo_contexto", !state.guardando, state.errorContexto,
+                                KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Next),
+                                KeyboardActions(onNext = { focus.moveFocus(FocusDirection.Down) }),
+                                modifier = Modifier)
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Entre 3 y 60 caracteres", style = textoAnimo(12), color = Brand.Muted)
+                                Text("${state.contexto.trim().length}/60", style = textoAnimo(12),
+                                    color = if (state.contexto.trim().length > 60) Brand.Error else Brand.Muted)
+                            }
+                            HorizontalDivider(color = Brand.Border)
+                            TextButton(onClick = { mostrarNota = !mostrarNota }, enabled = !state.guardando,
+                                contentPadding = PaddingValues(horizontal = 0.dp, vertical = 6.dp)) {
+                                Icon(painterResource(R.drawable.ic_form_note), null, Modifier.size(19.dp), tint = Brand.Teal)
+                                Spacer(Modifier.width(8.dp))
+                                Text(if (mostrarNota) "Ocultar nota opcional" else if (state.notaOpcional.isNotBlank()) "Editar nota opcional"
+                                    else "Añadir nota opcional", style = textoAnimo(14, FontWeight.Medium), color = Brand.Teal)
+                            }
+                            if (mostrarNota) {
+                                CampoAnimo(state.notaOpcional, onCambioNota, "Algo que quieras recordar…",
+                                    "Nota opcional", "animo_nota", !state.guardando, null,
+                                    KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Default),
+                                    KeyboardActions.Default)
+                            }
                         }
                     }
                 }
@@ -295,7 +304,7 @@ private fun OpcionAnimo(categoria: CategoriaAnimo, seleccionada: Boolean, enable
 private fun CampoAnimo(value: String, onChange: (String) -> Unit, placeholder: String,
     label: String, tag: String, enabled: Boolean, error: String?,
     options: KeyboardOptions, actions: KeyboardActions, modifier: Modifier = Modifier) {
-    OutlinedTextField(value = value, onValueChange = onChange, enabled = enabled,
+    OutlinedTextField(value = value, onValueChange = com.kiberkot.dailysync.ui.components.conActividadSesion(onChange), enabled = enabled,
         textStyle = textoAnimo(16), minLines = 2, maxLines = 5,
         placeholder = { Text(placeholder, style = textoAnimo(14), color = Color(0xFF7A9389)) },
         shape = RoundedCornerShape(18.dp), isError = error != null,
@@ -315,14 +324,7 @@ private fun ErrorAnimo(mensaje: String) {
         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
 }
 
-private fun descripcionIntensidad(valor: Int) = when (valor) {
-    1 -> "Muy suave"
-    2 -> "Suave"
-    3 -> "Moderada"
-    4 -> "Intensa"
-    5 -> "Muy intensa"
-    else -> "Elige un nivel"
-}
+private fun descripcionIntensidad(valor: Int) = com.kiberkot.dailysync.model.etiquetaIntensidad(valor)
 
 @Preview(showBackground = true, widthDp = 390, heightDp = 844)
 @Composable

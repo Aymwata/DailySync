@@ -5,6 +5,9 @@ import com.kiberkot.dailysync.model.AmbitoRegistro
 import com.kiberkot.dailysync.model.RegistroHistorial
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 class HistorialRepository(
     private val dao: DailySyncDao
@@ -22,7 +25,7 @@ class HistorialRepository(
 
             (animo + dbt + neuro + adicciones)
                 .sortedByDescending { it.fechaHora }
-        }
+        }.distinctUntilChanged().flowOn(Dispatchers.Default)
     }
 
     private fun observarAnimo(
@@ -46,7 +49,8 @@ class HistorialRepository(
                     descripcion = registro.contexto,
                     fechaHora = registro.fechaHora,
                     intensidad = registro.nivelIntensidad,
-                    pendienteSync = registro.pendienteSync
+                    pendienteSync = registro.pendienteSync,
+                    versionEscala = registro.versionEscala, editado = registro.editado
                 )
             }
         }
@@ -73,7 +77,8 @@ class HistorialRepository(
                     descripcion = registro.situacionAsociada,
                     fechaHora = registro.fechaHora,
                     intensidad = registro.nivelIntensidad,
-                    pendienteSync = registro.pendienteSync
+                    pendienteSync = registro.pendienteSync,
+                    versionEscala = registro.versionEscala, editado = registro.editado
                 )
             }
         }
@@ -100,7 +105,8 @@ class HistorialRepository(
                     descripcion = registro.contexto,
                     fechaHora = registro.fechaHora,
                     intensidad = registro.nivelSobrecarga,
-                    pendienteSync = registro.pendienteSync
+                    pendienteSync = registro.pendienteSync,
+                    versionEscala = registro.versionEscala, editado = registro.editado
                 )
             }
         }
@@ -122,12 +128,13 @@ class HistorialRepository(
                 RegistroHistorial(
                     id = registro.idRegistro,
                     ambito = AmbitoRegistro.ADICCIONES,
-                    titulo = acciones[registro.idAccionProtectora]
-                        ?.nombreAccion ?: "Registro de impulso",
+                    titulo = registro.otraAccion?.takeIf { registro.idAccionProtectora == 5 }
+                        ?: acciones[registro.idAccionProtectora]?.nombreAccion ?: "Registro de impulso",
                     descripcion = registro.desencadenante,
                     fechaHora = registro.fechaHora,
                     intensidad = registro.nivelImpulso,
-                    pendienteSync = registro.pendienteSync
+                    pendienteSync = registro.pendienteSync,
+                    versionEscala = registro.versionEscala, editado = registro.editado
                 )
             }
         }
